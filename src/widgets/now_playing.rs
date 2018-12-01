@@ -42,10 +42,12 @@ impl<'a> Widget for NowPlaying<'a> {
                 "{:?}\n{}\n{} - {}",
                 self.state, title, artist, album
             ))];
-            tui::widgets::Paragraph::new(text.iter())
-                .block(self.block.unwrap())
-                .wrap(false)
-                .draw(area, buf);
+            let para = tui::widgets::Paragraph::new(text.iter()).wrap(false);
+            let mut para = match self.block {
+                Some(block) => para.block(block),
+                None => para,
+            };
+            para.draw(area, buf);
         }
     }
 }
