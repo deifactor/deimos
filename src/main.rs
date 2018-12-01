@@ -1,4 +1,6 @@
 #![feature(nll)]
+mod events;
+
 use failure;
 use std::io;
 use termion::raw::IntoRawMode;
@@ -19,6 +21,7 @@ fn main() -> Result<(), failure::Error> {
         size: terminal.size()?,
     };
     println!("{}", termion::clear::All);
+    let receiver = events::EventReceiver::new(events::Config::default());
     loop {
         terminal.draw(|mut f| {
             widgets::Block::default()
@@ -26,6 +29,12 @@ fn main() -> Result<(), failure::Error> {
                 .borders(widgets::Borders::ALL)
                 .render(&mut f, app.size);
         })?;
+        match receiver.next()? {
+            events::Event::Input(termion::event::Event::Key(termion::event::Key::Char('q'))) => {
+                break
+            }
+            _ => {}
+        }
     }
     Ok(())
 }
