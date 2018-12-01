@@ -42,7 +42,7 @@ fn main() -> Result<(), failure::Error> {
             let mut block = tui_widgets::Block::default().borders(tui_widgets::Borders::ALL);
 
             let mut now_playing =
-                widgets::now_playing::NowPlaying::new(song, status.elapsed, status.state)
+                widgets::NowPlaying::new(song, status.elapsed, status.state)
                     .block(block);
             now_playing.render(&mut f, app.size);
         })?;
