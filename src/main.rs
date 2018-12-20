@@ -39,6 +39,8 @@ fn main() -> Result<(), failure::Error> {
         }
         let song = conn.currentsong().expect("failed to get song");
         let status = conn.status().expect("failed to get status");
+        let queue = conn.queue().expect("failed to get queue");
+        let pos = song.as_ref().and_then(|song| Some(song.place?.pos));
         terminal.draw(|mut f| {
             let layout = layout::Layout::default()
                 .direction(layout::Direction::Vertical)
@@ -46,6 +48,12 @@ fn main() -> Result<(), failure::Error> {
                 .split(app.size);
             let mut now_playing = widgets::NowPlaying::new(song, status.elapsed, status.state);
             now_playing.render(&mut f, layout[1]);
+
+            let mut queue_block = tui_widgets::Block::default()
+                .title("Queue")
+                .borders(tui_widgets::Borders::ALL);
+            queue_block.render(&mut f, layout[0]);
+            widgets::Queue::new(queue, pos).render(&mut f, queue_block.inner(layout[0]));
         })?;
         match receiver.next()? {
             events::Event::Input(termion::event::Event::Key(termion::event::Key::Char('q'))) => {
