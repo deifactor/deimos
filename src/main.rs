@@ -55,11 +55,10 @@ fn main() -> Result<(), failure::Error> {
             queue_block.render(&mut f, layout[0]);
             widgets::Queue::new(queue, pos).render(&mut f, queue_block.inner(layout[0]));
         })?;
-        match receiver.next()? {
-            events::Event::Input(termion::event::Event::Key(termion::event::Key::Char('q'))) => {
-                break;
-            }
-            _ => {}
+        if let events::Event::Input(termion::event::Event::Key(termion::event::Key::Char('q'))) =
+            receiver.next()?
+        {
+            break;
         }
     }
     Ok(())
