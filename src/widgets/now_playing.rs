@@ -3,8 +3,7 @@ use time::Duration;
 use tui;
 use tui::widgets::Widget;
 
-/// A widget displaying information about what's currently playing. Can be
-/// multiple lines tall.
+/// A widget displaying information about what's currently playing.
 pub struct NowPlaying {
     song: Option<Song>,
     elapsed: Option<Duration>,

@@ -8,12 +8,13 @@ use std::io;
 use termion::raw::IntoRawMode;
 use termion::screen::AlternateScreen;
 use tui;
-use tui::layout::Rect;
+use tui::layout;
+use tui::layout::Constraint;
 use tui::widgets as tui_widgets;
 use tui::widgets::Widget;
 
 struct App {
-    size: Rect,
+    size: layout::Rect,
 }
 
 fn main() -> Result<(), failure::Error> {
@@ -39,13 +40,16 @@ fn main() -> Result<(), failure::Error> {
         let song = conn.currentsong().expect("failed to get song");
         let status = conn.status().expect("failed to get status");
         terminal.draw(|mut f| {
-            let mut now_playing =
-                widgets::NowPlaying::new(song, status.elapsed, status.state);
-            now_playing.render(&mut f, app.size);
+            let layout = layout::Layout::default()
+                .direction(layout::Direction::Vertical)
+                .constraints(vec![Constraint::Min(4), Constraint::Length(1)])
+                .split(app.size);
+            let mut now_playing = widgets::NowPlaying::new(song, status.elapsed, status.state);
+            now_playing.render(&mut f, layout[1]);
         })?;
         match receiver.next()? {
             events::Event::Input(termion::event::Event::Key(termion::event::Key::Char('q'))) => {
-                break
+                break;
             }
             _ => {}
         }
