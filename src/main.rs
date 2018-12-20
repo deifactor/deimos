@@ -39,9 +39,8 @@ fn main() -> Result<(), failure::Error> {
         let song = conn.currentsong().expect("failed to get song");
         let status = conn.status().expect("failed to get status");
         terminal.draw(|mut f| {
-            let block = tui_widgets::Block::default().borders(tui_widgets::Borders::ALL);
             let mut now_playing =
-                widgets::NowPlaying::new(song, status.elapsed, status.state).block(block);
+                widgets::NowPlaying::new(song, status.elapsed, status.state);
             now_playing.render(&mut f, app.size);
         })?;
         match receiver.next()? {
