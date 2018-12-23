@@ -5,4 +5,5 @@ authors = ["Ash <relativistic.policeman@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-nom = "4.1.*"
+pest = "^2.1"
+pest_derive = "^2.1"

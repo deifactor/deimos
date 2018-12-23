@@ -1,6 +1,5 @@
 /// Functionality for parsing a format string into the internal AST-ish representation mimi uses.
-use nom::*;
-use nom::types::CompleteStr;
+use pest::Parser;
 
 /// A node in the parse tree.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -38,80 +37,54 @@ pub struct Style {
     modifiers: Vec<Modifier>,
 }
 
-named!(
-    literal<CompleteStr, Node>,
-    map!(
-        take_while!(|c| { c != '$' && c != '%' }),
-        |text| { Node::Literal(text.0) }
-    )
-);
+#[derive(Parser)]
+#[grammar = "grammar.pest"]
+struct MimiParser;
 
-/// Parses a single variable, of the form $foobar. TODO: Support an expression
-/// like ${foo}bar.
-named!(
-    variable<CompleteStr, Node>,
-    preceded!(tag!("$"), map!(
-        take_while1!(char::is_alphanumeric),
-        |name| { Node::Variable(name.0) }
-    ))
-);
-
-named!(
-    format_string<CompleteStr, Vec<Node>>,
-    many0!(alt!(variable | literal ))
-);
+/// Parses the format string into an output suitable for transformation via
+/// mimi's formatting methods. In the `Err` case, the value can be
+/// Display-formatted for a nice, user-readable error message.
+pub fn parse(input: &str) -> Result<Vec<Node>, pest::error::Error<Rule>> {
+    let tokens = MimiParser::parse(Rule::format_string, input)?
+        .filter_map(|pair| match pair.as_rule() {
+            Rule::literal => Some(Node::Literal(pair.as_str())),
+            Rule::variable => Some(Node::Variable(pair.into_inner().next().unwrap().as_str())),
+            Rule::EOI => None,
+            _ => panic!("Unexpected pair {:?}", pair),
+        })
+        .collect();
+    Ok(tokens)
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    mod variable {
-        use super::*;
-        #[test]
-        fn alphanumeric_variable() {
-            assert_eq!(
-                variable(CompleteStr("$foo ")),
-                Ok((CompleteStr(" "), Node::Variable("foo")))
-            );
-        }
-
-        #[test]
-        fn empty_variable() {
-            assert!(variable(CompleteStr("$ ")).is_err())
-        }
+    #[test]
+    fn literal_and_variable() {
+        assert_eq!(
+            parse("foo$bar"),
+            Ok(vec![Node::Literal("foo"), Node::Variable("bar")])
+        )
+    }
+    #[test]
+    fn variable_then_literal() {
+        assert_eq!(
+            parse("$foo!bar"),
+            Ok(vec![Node::Variable("foo"), Node::Literal("!bar")])
+        )
+    }
+    #[test]
+    fn consecutive_variables() {
+        assert_eq!(
+            parse("$foo$bar"),
+            Ok(vec![Node::Variable("foo"), Node::Variable("bar")])
+        )
     }
 
-    mod format_string {
-        use super::*;
-        #[test]
-        fn literal_and_variable() {
-            assert_eq!(
-                format_string(CompleteStr("foo$bar")),
-                Ok((
-                    CompleteStr(""),
-                    vec![Node::Literal("foo"), Node::Variable("bar")]
-                ))
-            )
-        }
-        #[test]
-        fn variable_then_literal() {
-            assert_eq!(
-                format_string(CompleteStr("$foo!bar")),
-                Ok((
-                    CompleteStr(""),
-                    vec![Node::Variable("foo"), Node::Literal("!bar")]
-                ))
-            )
-        }
-        #[test]
-        fn consecutive_variables() {
-            assert_eq!(
-                format_string(CompleteStr("$foo$bar")),
-                Ok((
-                    CompleteStr(""),
-                    vec![Node::Variable("foo"), Node::Variable("bar")]
-                ))
-            )
-        }
+    #[test]
+    fn no_identifier() {
+        assert!(parse("foo$").is_err());
+        assert!(parse("$ ").is_err());
     }
 }
