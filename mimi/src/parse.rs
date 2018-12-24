@@ -48,6 +48,15 @@ pub struct Style {
     modifiers: Vec<Modifier>,
 }
 
+impl Default for Style {
+    fn default() -> Style {
+        Style {
+            foreground: None,
+            modifiers: vec![],
+        }
+    }
+}
+
 #[derive(Parser)]
 #[grammar = "grammar.pest"]
 struct MimiParser;
@@ -71,9 +80,15 @@ fn build_style(style: pest::iterators::Pair<Rule>) -> Style {
 /// Parses the format string into an output suitable for transformation via
 /// mimi's formatting methods. In the `Err` cse, the value can be
 /// Display-formatted for a nice, user-readable error message.
-pub fn parse(input: &str) -> Result<Vec<Node>, pest::error::Error<Rule>> {
+///
+/// On success, the root is guaranteed to be a `Node::Formatted` variant with
+/// `Style::default()` as its style.
+pub fn parse(input: &str) -> Result<Node, pest::error::Error<Rule>> {
     let tokens = MimiParser::parse(Rule::format_string_entire, input)?;
-    Ok(build_nodes(tokens))
+    Ok(Node::Formatted {
+        style: Style::default(),
+        children: build_nodes(tokens),
+    })
 }
 
 fn build_nodes(pairs: pest::iterators::Pairs<Rule>) -> Vec<Node> {
@@ -97,32 +112,40 @@ fn build_nodes(pairs: pest::iterators::Pairs<Rule>) -> Vec<Node> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn literal_and_variable() {
-        assert_eq!(
-            parse("foo$bar"),
-            Ok(vec![Node::Literal("foo"), Node::Variable("bar")])
-        )
-    }
-    #[test]
-    fn variable_then_literal() {
-        assert_eq!(
-            parse("$foo!bar"),
-            Ok(vec![Node::Variable("foo"), Node::Literal("!bar")])
-        )
-    }
-    #[test]
-    fn consecutive_variables() {
-        assert_eq!(
-            parse("$foo$bar"),
-            Ok(vec![Node::Variable("foo"), Node::Variable("bar")])
-        )
+    fn children(input: &str) -> Vec<Node> {
+        let result = parse(input);
+        if let Ok(Node::Formatted { children, .. }) = result {
+            return children;
+        } else {
+            panic!("bad parse result {:?}", result);
+        }
     }
 
     #[test]
     fn no_identifier() {
         assert!(parse("foo$").is_err());
         assert!(parse("$ ").is_err());
+    }
+    #[test]
+    fn literal_and_variable() {
+        assert_eq!(
+            children("foo$bar"),
+            vec![Node::Literal("foo"), Node::Variable("bar")]
+        )
+    }
+    #[test]
+    fn variable_then_literal() {
+        assert_eq!(
+            children("$foo!bar"),
+            vec![Node::Variable("foo"), Node::Literal("!bar")],
+        )
+    }
+    #[test]
+    fn consecutive_variables() {
+        assert_eq!(
+            children("$foo$bar"),
+            vec![Node::Variable("foo"), Node::Variable("bar")],
+        )
     }
 
     #[test]
@@ -132,11 +155,11 @@ mod tests {
             modifiers: vec![],
         };
         assert_eq!(
-            parse("%[red]{text}"),
-            Ok(vec![Node::Formatted {
+            children("%[red]{text}"),
+            vec![Node::Formatted {
                 style,
-                children: vec![Node::Literal("text")]
-            }])
+                children: vec![Node::Literal("text")],
+            }],
         );
     }
 }
