@@ -1,4 +1,14 @@
-literal = {(!"$" ~ ANY)+}
+literal = {(!("$" | "%" | "{" | "}") ~ ANY)+}
+
 identifier = {ASCII_ALPHANUMERIC+}
 variable = {"$" ~ identifier}
-format_string = _{SOI ~ (literal | variable)* ~ EOI}
+
+color = _{ ^"red" | ^"black" | ^"white" }
+fg_color = { color }
+attribute = _{ fg_color }
+separator = _{ "," ~ " "* }
+style = { " "* ~ attribute ~ ("," ~ " "* ~ attribute)* ~ " "* }
+styled = { "%[" ~ style ~ "]{" ~ format_string ~ "}" }
+
+format_string = _{ (literal | variable | styled)+ }
+format_string_entire = _{ SOI ~ format_string ~ EOI }
