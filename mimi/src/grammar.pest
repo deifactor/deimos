@@ -3,9 +3,10 @@ literal = {(!("$" | "%" | "{" | "}") ~ ANY)+}
 identifier = {ASCII_ALPHANUMERIC+}
 variable = {"$" ~ identifier}
 
-color = _{ ^"red" | ^"black" | ^"white" }
+color = { ^"red" | ^"black" | ^"white" }
 fg_color = { color }
-attribute = _{ fg_color }
+bg_color = { "bg_" ~ color }
+attribute = _{ fg_color | bg_color }
 separator = _{ "," ~ " "* }
 style = { " "* ~ attribute ~ ("," ~ " "* ~ attribute)* ~ " "* }
 styled = { "%[" ~ style ~ "]{" ~ format_string ~ "}" }

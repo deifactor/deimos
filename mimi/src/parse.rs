@@ -45,6 +45,7 @@ fn parse_color(s: &str) -> Color {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Style {
     foreground: Option<Color>,
+    background: Option<Color>,
     modifiers: Vec<Modifier>,
 }
 
@@ -52,6 +53,7 @@ impl Default for Style {
     fn default() -> Style {
         Style {
             foreground: None,
+            background: None,
             modifiers: vec![],
         }
     }
@@ -65,14 +67,19 @@ struct MimiParser;
 fn build_style(style: pest::iterators::Pair<Rule>) -> Style {
     assert_eq!(style.as_rule(), Rule::style);
     let mut foreground = None;
+    let mut background = None;
     for attribute in style.into_inner() {
         match attribute.as_rule() {
             Rule::fg_color => foreground = Some(parse_color(attribute.as_str())),
+            Rule::bg_color => {
+                background = Some(parse_color(attribute.into_inner().next().unwrap().as_str()))
+            }
             _ => panic!("Unexpected pair {:?}", attribute),
         }
     }
     Style {
         foreground,
+        background,
         modifiers: vec![],
     }
 }
@@ -152,7 +159,7 @@ mod tests {
     fn format_string() {
         let style = Style {
             foreground: Some(Color::Red),
-            modifiers: vec![],
+            ..Style::default()
         };
         assert_eq!(
             children("%[red]{text}"),
@@ -162,4 +169,51 @@ mod tests {
             }],
         );
     }
+
+    #[test]
+    fn background() {
+        let style = Style {
+            background: Some(Color::White),
+            ..Style::default()
+        };
+        assert_eq!(
+            children("%[bg_white]{text}"),
+            vec![Node::Formatted {
+                style,
+                children: vec![Node::Literal("text")]
+            }]
+        );
+    }
+
+    #[test]
+    fn multiple_colors() {
+        let style = Style {
+            foreground: Some(Color::Black),
+            ..Style::default()
+        };
+        assert_eq!(
+            children("%[red, black]{text}"),
+            vec![Node::Formatted {
+                style,
+                children: vec![Node::Literal("text")]
+            }]
+        );
+    }
+
+    #[test]
+    fn attribute_spaces() {
+        let style = Style {
+            foreground: Some(Color::Black),
+            background: Some(Color::White),
+            ..Style::default()
+        };
+        assert_eq!(
+            children("%[     bg_white,    black   ]{text}"),
+            vec![Node::Formatted {
+                style,
+                children: vec![Node::Literal("text")]
+            }]
+        );
+    }
+
 }
