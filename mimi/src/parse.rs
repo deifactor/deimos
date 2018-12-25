@@ -1,5 +1,6 @@
 /// Functionality for parsing a format string into the internal AST-ish representation mimi uses.
 use pest::Parser;
+use std::collections::HashSet;
 
 /// A node in the parse tree.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -15,7 +16,7 @@ pub enum Node<'a> {
 }
 
 /// Any formatting information that isn't foreground or background color.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Modifier {
     Bold,
 }
@@ -46,7 +47,7 @@ fn parse_color(s: &str) -> Color {
 pub struct Style {
     foreground: Option<Color>,
     background: Option<Color>,
-    modifiers: Vec<Modifier>,
+    modifiers: HashSet<Modifier>,
 }
 
 impl Default for Style {
@@ -54,7 +55,7 @@ impl Default for Style {
         Style {
             foreground: None,
             background: None,
-            modifiers: vec![],
+            modifiers: HashSet::new(),
         }
     }
 }
@@ -80,7 +81,7 @@ fn build_style(style: pest::iterators::Pair<Rule>) -> Style {
     Style {
         foreground,
         background,
-        modifiers: vec![],
+        modifiers: HashSet::new(),
     }
 }
 
