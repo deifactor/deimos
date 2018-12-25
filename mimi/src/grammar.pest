@@ -8,7 +8,7 @@ fg_color = { color }
 bg_color = { "bg_" ~ color }
 attribute = _{ fg_color | bg_color }
 separator = _{ "," ~ " "* }
-style = { " "* ~ attribute ~ ("," ~ " "* ~ attribute)* ~ " "* }
+style = { " "* ~ attribute ~ (separator ~ attribute)* ~ " "* }
 styled = { "%[" ~ style ~ "]{" ~ format_string ~ "}" }
 
 format_string = _{ (literal | variable | styled)+ }
