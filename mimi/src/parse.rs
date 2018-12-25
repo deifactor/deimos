@@ -21,6 +21,15 @@ pub enum Modifier {
     Bold,
 }
 
+/// Converts the string specified in the pest grammar into a modifier. Panics on
+/// an invalid modifier.
+fn parse_modifier(s: &str) -> Modifier {
+    match s {
+        "bold" => Modifier::Bold,
+        _ => panic!("bad modifier {}", s),
+    }
+}
+
 /// Foreground or background color.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Color {
@@ -67,22 +76,22 @@ struct MimiParser;
 /// Builds a `Style` from the pair corresponding to a `style` rule.
 fn build_style(style: pest::iterators::Pair<Rule>) -> Style {
     assert_eq!(style.as_rule(), Rule::style);
-    let mut foreground = None;
-    let mut background = None;
+    let mut built = Style::default();
     for attribute in style.into_inner() {
         match attribute.as_rule() {
-            Rule::fg_color => foreground = Some(parse_color(attribute.as_str())),
+            Rule::fg_color => built.foreground = Some(parse_color(attribute.as_str())),
             Rule::bg_color => {
-                background = Some(parse_color(attribute.into_inner().next().unwrap().as_str()))
+                built.background =
+                    Some(parse_color(attribute.into_inner().next().unwrap().as_str()))
+            }
+            Rule::modifier => {
+                built.modifiers.insert(parse_modifier(attribute.as_str()));
+                ()
             }
             _ => panic!("Unexpected pair {:?}", attribute),
         }
     }
-    Style {
-        foreground,
-        background,
-        modifiers: HashSet::new(),
-    }
+    built
 }
 
 /// Parses the format string into an output suitable for transformation via
@@ -210,6 +219,23 @@ mod tests {
         };
         assert_eq!(
             children("%[     bg_white,    black   ]{text}"),
+            vec![Node::Formatted {
+                style,
+                children: vec![Node::Literal("text")]
+            }]
+        );
+    }
+
+    #[test]
+    fn modifiers() {
+        let mut modifiers = HashSet::new();
+        modifiers.insert(Modifier::Bold);
+        let style = Style {
+            modifiers,
+            ..Style::default()
+        };
+        assert_eq!(
+            children("%[bold]{text}"),
             vec![Node::Formatted {
                 style,
                 children: vec![Node::Literal("text")]
