@@ -4,14 +4,14 @@ use std::collections::HashSet;
 
 /// A node in the parse tree.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Node<'a> {
+pub enum Node {
     /// A textual literal.
-    Literal(&'a str),
+    Literal(String),
     /// A variable whose name is given by the string.
-    Variable(&'a str),
+    Variable(String),
     Formatted {
         style: Style,
-        children: Vec<Node<'a>>,
+        children: Vec<Node>,
     },
 }
 
@@ -111,8 +111,10 @@ pub fn parse(input: &str) -> Result<Node, pest::error::Error<Rule>> {
 fn build_nodes(pairs: pest::iterators::Pairs<Rule>) -> Vec<Node> {
     pairs
         .filter_map(|pair| match pair.as_rule() {
-            Rule::literal => Some(Node::Literal(pair.as_str())),
-            Rule::variable => Some(Node::Variable(pair.into_inner().next().unwrap().as_str())),
+            Rule::literal => Some(Node::Literal(pair.as_str().to_owned())),
+            Rule::variable => Some(Node::Variable(
+                pair.into_inner().next().unwrap().as_str().to_owned(),
+            )),
             Rule::styled => Some({
                 let mut pairs = pair.into_inner();
                 let style = build_style(pairs.next().unwrap());
@@ -147,21 +149,21 @@ mod tests {
     fn literal_and_variable() {
         assert_eq!(
             children("foo$bar"),
-            vec![Node::Literal("foo"), Node::Variable("bar")]
+            vec![Node::Literal("foo".into()), Node::Variable("bar".into())]
         )
     }
     #[test]
     fn variable_then_literal() {
         assert_eq!(
             children("$foo!bar"),
-            vec![Node::Variable("foo"), Node::Literal("!bar")],
+            vec![Node::Variable("foo".into()), Node::Literal("!bar".into())],
         )
     }
     #[test]
     fn consecutive_variables() {
         assert_eq!(
             children("$foo$bar"),
-            vec![Node::Variable("foo"), Node::Variable("bar")],
+            vec![Node::Variable("foo".into()), Node::Variable("bar".into())],
         )
     }
 
@@ -175,7 +177,7 @@ mod tests {
             children("%[red]{text}"),
             vec![Node::Formatted {
                 style,
-                children: vec![Node::Literal("text")],
+                children: vec![Node::Literal("text".into())],
             }],
         );
     }
@@ -190,7 +192,7 @@ mod tests {
             children("%[bg_white]{text}"),
             vec![Node::Formatted {
                 style,
-                children: vec![Node::Literal("text")]
+                children: vec![Node::Literal("text".into())]
             }]
         );
     }
@@ -205,7 +207,7 @@ mod tests {
             children("%[red, black]{text}"),
             vec![Node::Formatted {
                 style,
-                children: vec![Node::Literal("text")]
+                children: vec![Node::Literal("text".into())]
             }]
         );
     }
@@ -221,7 +223,7 @@ mod tests {
             children("%[     bg_white,    black   ]{text}"),
             vec![Node::Formatted {
                 style,
-                children: vec![Node::Literal("text")]
+                children: vec![Node::Literal("text".into())]
             }]
         );
     }
@@ -238,7 +240,7 @@ mod tests {
             children("%[bold]{text}"),
             vec![Node::Formatted {
                 style,
-                children: vec![Node::Literal("text")]
+                children: vec![Node::Literal("text".into())]
             }]
         );
     }
