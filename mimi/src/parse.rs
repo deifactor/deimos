@@ -19,6 +19,7 @@ pub enum Node {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Modifier {
     Bold,
+    Underline,
 }
 
 /// Converts the string specified in the pest grammar into a modifier. Panics on
@@ -26,6 +27,7 @@ pub enum Modifier {
 fn parse_modifier(s: &str) -> Modifier {
     match s {
         "bold" => Modifier::Bold,
+        "underline" => Modifier::Underline,
         _ => panic!("bad modifier {}", s),
     }
 }
@@ -37,15 +39,25 @@ pub enum Color {
     Black,
     White,
     Red,
+    Green,
+    Yellow,
+    Blue,
+    Magenta,
+    Cyan,
 }
 
 /// Converts the string specified in the pest grammar into a color. Panics on an
 /// invalid color.
 fn parse_color(s: &str) -> Color {
     match s {
-        "red" => Color::Red,
         "black" => Color::Black,
         "white" => Color::White,
+        "red" => Color::Red,
+        "green" => Color::Green,
+        "yellow" => Color::Yellow,
+        "blue" => Color::Blue,
+        "magenta" => Color::Magenta,
+        "cyan" => Color::Cyan,
         _ => panic!("bad parse color {}", s),
     }
 }
