@@ -1,6 +1,6 @@
 /// Functionality for parsing a format string into the internal AST-ish representation mimi uses.
+use crate::style::{Color, Modifier, Style};
 use pest::Parser;
-use std::collections::HashSet;
 
 /// A node in the parse tree.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -15,13 +15,6 @@ pub enum Node {
     },
 }
 
-/// Any formatting information that isn't foreground or background color.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Modifier {
-    Bold,
-    Underline,
-}
-
 /// Converts the string specified in the pest grammar into a modifier. Panics on
 /// an invalid modifier.
 fn parse_modifier(s: &str) -> Modifier {
@@ -30,20 +23,6 @@ fn parse_modifier(s: &str) -> Modifier {
         "underline" => Modifier::Underline,
         _ => panic!("bad modifier {}", s),
     }
-}
-
-/// Foreground or background color.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum Color {
-    Reset,
-    Black,
-    White,
-    Red,
-    Green,
-    Yellow,
-    Blue,
-    Magenta,
-    Cyan,
 }
 
 /// Converts the string specified in the pest grammar into a color. Panics on an
@@ -59,25 +38,6 @@ fn parse_color(s: &str) -> Color {
         "magenta" => Color::Magenta,
         "cyan" => Color::Cyan,
         _ => panic!("bad parse color {}", s),
-    }
-}
-
-/// Describes the foreground color, background color, and any additional
-/// modifications (inverse, bold, etc).
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Style {
-    foreground: Option<Color>,
-    background: Option<Color>,
-    modifiers: HashSet<Modifier>,
-}
-
-impl Default for Style {
-    fn default() -> Style {
-        Style {
-            foreground: None,
-            background: None,
-            modifiers: HashSet::new(),
-        }
     }
 }
 
@@ -142,6 +102,7 @@ fn build_nodes(pairs: pest::iterators::Pairs<Rule>) -> Vec<Node> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
 
     fn children(input: &str) -> Vec<Node> {
         let result = parse(input);
