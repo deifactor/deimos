@@ -9,3 +9,11 @@ maplit = "^1.0"
 pest = "^2.1"
 pest_derive = "^2.1"
 termion = "^1.5"
+
+# Only needed for the example binaries.
+failure = "^0.1"
+structopt = "0.2"
+
+[[bin]]
+name = "demo"
+path = "src/bin/demo.rs"
