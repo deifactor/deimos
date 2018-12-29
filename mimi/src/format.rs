@@ -44,7 +44,7 @@ impl Formatter {
         &self.keys
     }
 
-    fn ansi(&self, values: &HashMap<String, String>) -> String {
+    pub fn ansi(&self, values: &HashMap<String, String>) -> String {
         styled_leaves(&self.root, values, Style::default())
             .map(|(text, style)| format!("{}{}{}", style.ansi(), text, termion::style::Reset))
             .collect()
