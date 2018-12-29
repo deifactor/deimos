@@ -1,11 +1,22 @@
 /// Functionality for colors, modifiers (bold/underline), etc.
 use std::collections::HashSet;
+use termion;
 
 /// Any formatting information that isn't foreground or background color.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Modifier {
     Bold,
     Underline,
+}
+
+impl Modifier {
+    /// The corresponding ANSI control code.
+    fn ansi(&self) -> String {
+        match self {
+            Modifier::Bold => format!("{}", termion::style::Bold),
+            Modifier::Underline => format!("{}", termion::style::Underline),
+        }
+    }
 }
 
 /// Foreground or background color.
@@ -20,6 +31,22 @@ pub enum Color {
     Blue,
     Magenta,
     Cyan,
+}
+
+impl Color {
+    fn termion(&self) -> Box<termion::color::Color> {
+        match &self {
+            Color::Reset => Box::new(termion::color::Reset),
+            Color::Black => Box::new(termion::color::Black),
+            Color::White => Box::new(termion::color::White),
+            Color::Red => Box::new(termion::color::Red),
+            Color::Green => Box::new(termion::color::Green),
+            Color::Yellow => Box::new(termion::color::Yellow),
+            Color::Blue => Box::new(termion::color::Blue),
+            Color::Magenta => Box::new(termion::color::Magenta),
+            Color::Cyan => Box::new(termion::color::Cyan),
+        }
+    }
 }
 
 /// Describes the foreground color, background color, and any additional
@@ -57,6 +84,23 @@ impl Style {
             background: other.background.or(self.background),
             modifiers: &other.modifiers | &self.modifiers,
         }
+    }
+
+    /// An ANSI control code sequence that will cause text to be formatted in
+    /// the given style. This assumes that the old state has no foreground
+    /// color, no background color, etc.
+    pub fn ansi(&self) -> String {
+        let mut s = "".to_owned();
+        if let Some(color) = self.foreground {
+            s.push_str(&format!("{}", termion::color::Fg(&*color.termion())));
+        }
+        if let Some(color) = self.background {
+            s.push_str(&format!("{}", termion::color::Bg(&*color.termion())));
+        }
+        for modifier in &self.modifiers {
+            s.push_str(&modifier.ansi())
+        }
+        s
     }
 }
 
