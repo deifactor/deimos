@@ -1,7 +1,5 @@
-#[macro_use]
 extern crate structopt;
 use failure::bail;
-use mimi::format;
 use mimi::format::Formatter;
 use std::collections::HashMap;
 use structopt::StructOpt;

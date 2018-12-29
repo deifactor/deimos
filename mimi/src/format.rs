@@ -27,7 +27,7 @@ impl fmt::Display for ParseFormatterError {
 impl error::Error for ParseFormatterError {
     fn description(&self) -> &str {
         match &self {
-            ParseFormatterError::FormatStringError(e) => "format string error"
+            ParseFormatterError::FormatStringError(_) => "format string error"
         }
     }
 

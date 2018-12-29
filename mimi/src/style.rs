@@ -11,7 +11,7 @@ pub enum Modifier {
 
 impl Modifier {
     /// The corresponding ANSI control code.
-    fn ansi(&self) -> String {
+    fn ansi(self) -> String {
         match self {
             Modifier::Bold => format!("{}", termion::style::Bold),
             Modifier::Underline => format!("{}", termion::style::Underline),
@@ -34,8 +34,8 @@ pub enum Color {
 }
 
 impl Color {
-    fn termion(&self) -> Box<termion::color::Color> {
-        match &self {
+    fn termion(self) -> Box<termion::color::Color> {
+        match self {
             Color::Reset => Box::new(termion::color::Reset),
             Color::Black => Box::new(termion::color::Black),
             Color::White => Box::new(termion::color::White),

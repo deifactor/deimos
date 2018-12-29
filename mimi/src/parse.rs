@@ -58,7 +58,6 @@ fn build_style(style: pest::iterators::Pair<Rule>) -> Style {
             }
             Rule::modifier => {
                 built.modifiers.insert(parse_modifier(attribute.as_str()));
-                ()
             }
             _ => panic!("Unexpected pair {:?}", attribute),
         }
