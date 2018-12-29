@@ -14,6 +14,8 @@ termion = "^1.5"
 failure = "^0.1"
 structopt = "0.2"
 
+tui = "0.3"
+
 [[bin]]
 name = "demo"
 path = "src/bin/demo.rs"
