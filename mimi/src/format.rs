@@ -44,7 +44,7 @@ impl Formatter {
         &self.keys
     }
 
-    pub fn ansi(&self, values: &HashMap<String, String>) -> String {
+    pub fn ansi<'a, M: std::ops::Index<&'a str, Output = String>>(&'a self, values: &M) -> String {
         self.spans(values)
             .map(|(text, style)| format!("{}{}{}", style.ansi(), text, termion::style::Reset))
             .collect()
@@ -56,13 +56,16 @@ impl Formatter {
     /// Returns an iterator over (text, style) pairs. We do *not* guarantee that the
     /// representation is minimal (in that it's possible for there to be adjacent
     /// pairs with identical styles).
-    pub fn spans(&self, values: &HashMap<String, String>) -> Box<Iterator<Item = (String, Style)>> {
+    pub fn spans<'a, M: std::ops::Index<&'a str, Output = String>>(
+        &'a self,
+        values: &M,
+    ) -> Box<Iterator<Item = (String, Style)>> {
         Formatter::spans_impl(&self.root, values, Style::default())
     }
 
-    fn spans_impl(
-        root: &parse::Node,
-        values: &HashMap<String, String>,
+    fn spans_impl<'a, M: std::ops::Index<&'a str, Output = String>>(
+        root: &'a parse::Node,
+        values: &M,
         base: Style,
     ) -> Box<Iterator<Item = (String, Style)>> {
         match root {
