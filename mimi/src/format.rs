@@ -27,13 +27,13 @@ impl fmt::Display for ParseFormatterError {
 impl error::Error for ParseFormatterError {
     fn description(&self) -> &str {
         match &self {
-            ParseFormatterError::FormatStringError(_) => "format string error"
+            ParseFormatterError::FormatStringError(_) => "format string error",
         }
     }
 
     fn cause(&self) -> Option<&dyn error::Error> {
         match &self {
-            ParseFormatterError::FormatStringError(e) => Some(e)
+            ParseFormatterError::FormatStringError(e) => Some(e),
         }
     }
 }
@@ -45,9 +45,37 @@ impl Formatter {
     }
 
     pub fn ansi(&self, values: &HashMap<String, String>) -> String {
-        styled_leaves(&self.root, values, Style::default())
+        self.spans(values)
             .map(|(text, style)| format!("{}{}{}", style.ansi(), text, termion::style::Reset))
             .collect()
+    }
+
+    /// Yields the text of each leaf node under `root` with variables substituted by
+    /// looking up in `values` and using `base` as the base of each style.
+    ///
+    /// Returns an iterator over (text, style) pairs. We do *not* guarantee that the
+    /// representation is minimal (in that it's possible for there to be adjacent
+    /// pairs with identical styles).
+    pub fn spans(&self, values: &HashMap<String, String>) -> Box<Iterator<Item = (String, Style)>> {
+        Formatter::spans_impl(&self.root, values, Style::default())
+    }
+
+    fn spans_impl(
+        root: &parse::Node,
+        values: &HashMap<String, String>,
+        base: Style,
+    ) -> Box<Iterator<Item = (String, Style)>> {
+        match root {
+            Node::Literal(s) => Box::new(iter::once((s.clone(), base.clone()))),
+            Node::Variable(key) => Box::new(iter::once((values[key].clone(), base.clone()))),
+            Node::Formatted { style, children } => Box::new(
+                children
+                    .iter()
+                    .flat_map(|child| Formatter::spans_impl(child, values, base.combine(style)))
+                    .collect::<Vec<_>>()
+                    .into_iter(),
+            ),
+        }
     }
 }
 
@@ -71,30 +99,6 @@ impl std::str::FromStr for Formatter {
             }
             Err(err) => Err(ParseFormatterError::FormatStringError(err)),
         }
-    }
-}
-
-/// Yields the text of each leaf node under `root` with variables substituted by
-/// looking up in `values` and using `base` as the base of each style.
-///
-/// Returns an iterator over (text, style) pairs. We do *not* guarantee that the
-/// representation is minimal (in that it's possible for there to be adjacent
-/// pairs with identical styles).
-fn styled_leaves(
-    root: &parse::Node,
-    values: &HashMap<String, String>,
-    base: Style,
-) -> Box<Iterator<Item = (String, Style)>> {
-    match root {
-        Node::Literal(s) => Box::new(iter::once((s.clone(), base.clone()))),
-        Node::Variable(key) => Box::new(iter::once((values[key].clone(), base.clone()))),
-        Node::Formatted { style, children } => Box::new(
-            children
-                .iter()
-                .flat_map(|child| styled_leaves(child, values, base.combine(style)))
-                .collect::<Vec<_>>()
-                .into_iter(),
-        ),
     }
 }
 
