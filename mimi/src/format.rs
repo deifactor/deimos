@@ -3,7 +3,7 @@ use crate::parse::Node;
 use crate::style::Style;
 use maplit::hashset;
 use std::collections::{HashMap, HashSet};
-use std::iter;
+use std::{error, fmt, iter};
 
 #[derive(Clone, Debug)]
 pub struct Formatter {
@@ -14,6 +14,28 @@ pub struct Formatter {
 #[derive(Clone, Debug)]
 pub enum ParseFormatterError {
     FormatStringError(pest::error::Error<parse::Rule>),
+}
+
+impl fmt::Display for ParseFormatterError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> fmt::Result {
+        match self {
+            ParseFormatterError::FormatStringError(e) => write!(f, "{}", e),
+        }
+    }
+}
+
+impl error::Error for ParseFormatterError {
+    fn description(&self) -> &str {
+        match &self {
+            ParseFormatterError::FormatStringError(e) => "format string error"
+        }
+    }
+
+    fn cause(&self) -> Option<&dyn error::Error> {
+        match &self {
+            ParseFormatterError::FormatStringError(e) => Some(e)
+        }
+    }
 }
 
 impl Formatter {
