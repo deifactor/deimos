@@ -1,4 +1,6 @@
+use maplit::hashmap;
 use mpd::song::Song;
+use std::collections::HashMap;
 use time::Duration;
 use tui;
 use tui::widgets::Widget;
@@ -39,17 +41,20 @@ impl Widget for NowPlaying {
                     tui::style::Style::default(),
                 )
             }
-            let title = song.title.as_ref().unwrap_or(&"Unknown".into()).clone();
-            let artist = song.tags.get("Artist").unwrap_or(&"Unknown".into()).clone();
-            let album = song.tags.get("Album").unwrap_or(&"Unknown".into()).clone();
-            let text = format!("{:?}: {} - {} - {}", self.state, title, artist, album);
-            buf.set_stringn(
-                area.left(),
-                area.top(),
-                text,
-                area.width as usize,
-                tui::style::Style::default(),
-            );
+            let values = hashmap![
+                "title" => song.title.clone().unwrap_or("Unknown".to_owned()),
+                "artist" => song.tags.get("Artist").cloned().unwrap_or("Unknown".to_owned()),
+                "album" => song.tags.get("Album").cloned().unwrap_or("Unknown".to_owned()),
+            ];
+            let formatter: mimi::format::Formatter =
+                "%[red]{$title} - %[green]{$artist} - %[blue]{$album}"
+                    .parse()
+                    .unwrap();
+            let texts: Vec<_> = formatter
+                .spans(&values)
+                .map(|(text, style)| tui::widgets::Text::styled(text, style.into()))
+                .collect();
+            tui::widgets::Paragraph::new(texts.iter()).draw(area, buf);
         }
     }
 }
