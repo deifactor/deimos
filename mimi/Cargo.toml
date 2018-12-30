@@ -9,12 +9,13 @@ maplit = "^1.0"
 pest = "^2.1"
 pest_derive = "^2.1"
 termion = "^1.5"
+tui = "0.3"
 
-# Only needed for the example binaries.
+[dev-dependencies]
+# Necessary for the demo binary.
 failure = "^0.1"
 structopt = "0.2"
 
-tui = "0.3"
 
 [[bin]]
 name = "demo"
