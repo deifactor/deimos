@@ -117,6 +117,7 @@ mod tests {
         assert!(parse("foo$").is_err());
         assert!(parse("$ ").is_err());
     }
+
     #[test]
     fn literal_and_variable() {
         assert_eq!(
@@ -124,6 +125,7 @@ mod tests {
             vec![Node::Literal("foo".into()), Node::Variable("bar".into())]
         )
     }
+
     #[test]
     fn variable_then_literal() {
         assert_eq!(
@@ -131,11 +133,20 @@ mod tests {
             vec![Node::Variable("foo".into()), Node::Literal("!bar".into())],
         )
     }
+
     #[test]
     fn consecutive_variables() {
         assert_eq!(
             children("$foo$bar"),
             vec![Node::Variable("foo".into()), Node::Variable("bar".into())],
+        )
+    }
+
+    #[test]
+    fn braced_variable_name() {
+        assert_eq!(
+            children("${foo}bar"),
+            vec![Node::Variable("foo".into()), Node::Literal("bar".into())]
         )
     }
 

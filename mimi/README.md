@@ -7,8 +7,8 @@ client, but of course other uses are welcome.
 ## Syntax
 
 Variables are included using shell-like `$foo` syntax. Variable names can
-contain `a-zA-Z0-9_` (ASCII-only). There's currently no way to do something like
-`${foo}bar` to end the name of a variable early.
+contain `a-zA-Z0-9_` (ASCII-only). `${foo}bar` is valid syntax, and is parsed as
+a variable named 'foo' followed immediately by the literal `bar`.
 
 A styled section looks like `%[bold]{blah $foo blah}`. The style information
 goes between the square brackets. Valid style names are:

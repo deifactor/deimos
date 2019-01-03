@@ -1,7 +1,7 @@
 literal = {(!("$" | "%" | "{" | "}") ~ ANY)+}
 
 identifier = {ASCII_ALPHANUMERIC+}
-variable = {"$" ~ identifier}
+variable = {"$" ~ (identifier | "{" ~ identifier ~ "}")}
 
 color = { ^"black" | ^"white" | ^"red" | ^"green" | ^"yellow" | ^"blue" | ^"magenta" | ^"cyan" }
 fg_color = { color }
