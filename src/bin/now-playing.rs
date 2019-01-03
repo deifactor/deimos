@@ -1,5 +1,4 @@
 // run like `now-playing path/to/music/directory`
-#![feature(nll)]
 use id3;
 use mpd;
 use std::path::Path;

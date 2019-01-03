@@ -1,4 +1,3 @@
-#![feature(nll)]
 mod events;
 mod widgets;
 
