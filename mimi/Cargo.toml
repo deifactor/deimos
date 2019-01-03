@@ -16,6 +16,10 @@ tui = "0.3"
 failure = "^0.1"
 structopt = "0.2"
 
+[features]
+default = []
+to_tui = []
+
 
 [[bin]]
 name = "demo"

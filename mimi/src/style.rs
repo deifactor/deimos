@@ -19,15 +19,6 @@ impl Modifier {
     }
 }
 
-impl From<Modifier> for tui::style::Modifier {
-    fn from(modifier: Modifier) -> tui::style::Modifier {
-        match modifier {
-            Modifier::Bold => tui::style::Modifier::Bold,
-            Modifier::Underline => tui::style::Modifier::Underline,
-        }
-    }
-}
-
 /// Foreground or background color.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Color {
@@ -58,22 +49,6 @@ impl Color {
     }
 }
 
-impl From<Color> for tui::style::Color {
-    fn from(color: Color) -> tui::style::Color {
-        match color {
-            Color::Reset => tui::style::Color::Reset,
-            Color::Black => tui::style::Color::Black,
-            Color::White => tui::style::Color::White,
-            Color::Red => tui::style::Color::Red,
-            Color::Green => tui::style::Color::Green,
-            Color::Yellow => tui::style::Color::Yellow,
-            Color::Blue => tui::style::Color::Blue,
-            Color::Magenta => tui::style::Color::Magenta,
-            Color::Cyan => tui::style::Color::Cyan,
-        }
-    }
-}
-
 /// Describes the foreground color, background color, and any additional
 /// modifications (inverse, bold, etc).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -81,25 +56,6 @@ pub struct Style {
     pub foreground: Option<Color>,
     pub background: Option<Color>,
     pub modifiers: HashSet<Modifier>,
-}
-
-impl From<Style> for tui::style::Style {
-    fn from(style: Style) -> tui::style::Style {
-        assert!(
-            style.modifiers.len() <= 1,
-            "tui can't stack modifiers, got {:?}",
-            style.modifiers
-        );
-        tui::style::Style {
-            fg: style.foreground.unwrap_or(Color::Reset).into(),
-            bg: style.background.unwrap_or(Color::Reset).into(),
-            modifier: style
-                .modifiers
-                .into_iter()
-                .next()
-                .map_or(tui::style::Modifier::Reset, |m| m.into()),
-        }
-    }
 }
 
 impl Default for Style {
@@ -145,6 +101,53 @@ impl Style {
             s.push_str(&modifier.ansi())
         }
         s
+    }
+}
+
+#[cfg(feature = "to_tui")]
+impl From<Modifier> for tui::style::Modifier {
+    fn from(modifier: Modifier) -> tui::style::Modifier {
+        match modifier {
+            Modifier::Bold => tui::style::Modifier::Bold,
+            Modifier::Underline => tui::style::Modifier::Underline,
+        }
+    }
+}
+
+#[cfg(feature = "to_tui")]
+impl From<Color> for tui::style::Color {
+    fn from(color: Color) -> tui::style::Color {
+        match color {
+            Color::Reset => tui::style::Color::Reset,
+            Color::Black => tui::style::Color::Black,
+            Color::White => tui::style::Color::White,
+            Color::Red => tui::style::Color::Red,
+            Color::Green => tui::style::Color::Green,
+            Color::Yellow => tui::style::Color::Yellow,
+            Color::Blue => tui::style::Color::Blue,
+            Color::Magenta => tui::style::Color::Magenta,
+            Color::Cyan => tui::style::Color::Cyan,
+        }
+    }
+}
+
+#[cfg(feature = "to_tui")]
+impl From<Style> for tui::style::Style {
+    fn from(style: Style) -> tui::style::Style {
+        assert!(
+            style.modifiers.len() <= 1,
+            "tui can't stack modifiers, got {:?}",
+            style.modifiers
+        );
+        tui::style::Style {
+            fg: style.foreground.unwrap_or(Color::Reset).into(),
+            bg: style.background.unwrap_or(Color::Reset).into(),
+            modifier: style
+                .modifiers
+                .into_iter()
+                .next()
+                .map_or(tui::style::Modifier::Reset, |m| m.into()),
+        }
     }
 }
 
