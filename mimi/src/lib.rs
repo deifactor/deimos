@@ -6,7 +6,7 @@
 //!
 //! ```
 //! use std::collections::HashMap;
-//! let formatter: mimi::format::Formatter = "foo is %[red]{$foo}".parse().unwrap();
+//! let formatter: mimi::Formatter = "foo is %[red]{$foo}".parse().unwrap();
 //! let mut values = HashMap::new();
 //! values.insert("foo", "value".to_owned());
 //! println!("{}", formatter.ansi(&values));
@@ -16,6 +16,9 @@
 #[macro_use]
 extern crate pest_derive;
 
-pub mod format;
-pub mod parse;
-pub mod style;
+pub use crate::format::{Formatter, ParseFormatterError};
+pub use crate::style::{Modifier, Color, Style};
+
+mod format;
+mod parse;
+mod style;

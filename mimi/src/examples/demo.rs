@@ -1,6 +1,6 @@
 extern crate structopt;
 use failure::bail;
-use mimi::format::Formatter;
+use mimi::Formatter;
 use std::collections::HashMap;
 use structopt::StructOpt;
 

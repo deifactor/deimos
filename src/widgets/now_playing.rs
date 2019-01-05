@@ -46,7 +46,7 @@ impl Widget for NowPlaying {
                 "artist" => song.tags.get("Artist").cloned().unwrap_or("Unknown".to_owned()),
                 "album" => song.tags.get("Album").cloned().unwrap_or("Unknown".to_owned()),
             ];
-            let formatter: mimi::format::Formatter =
+            let formatter: mimi::Formatter =
                 "%[red]{$title} - %[green]{$artist} - %[blue]{$album}"
                     .parse()
                     .unwrap();
