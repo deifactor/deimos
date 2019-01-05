@@ -5,6 +5,7 @@ use maplit::hashset;
 use std::collections::HashSet;
 use std::{error, fmt, iter};
 
+/// A `Formatter` takes a bunch of key/value pairs and interpolates them into a mimi format string.
 #[derive(Clone, Debug)]
 pub struct Formatter {
     root: parse::Node,
@@ -44,14 +45,18 @@ impl Formatter {
         &self.keys
     }
 
+    /// Formats the given values using ANSI terminal codes.
     pub fn ansi<'a, M: std::ops::Index<&'a str, Output = String>>(&'a self, values: &M) -> String {
         self.spans(values)
             .map(|(text, style)| format!("{}{}{}", style.ansi(), text, termion::style::Reset))
             .collect()
     }
 
-    /// Yields the text of each leaf node under `root` with variables substituted by
-    /// looking up in `values` and using `base` as the base of each style.
+    /// Yields the text of each leaf node under `root` with variables
+    /// substituted by looking up in `values` and using `base` as the base of
+    /// each style. Combined with a function that can take a `String` and a
+    /// `Style` and format them, this gives you the ability to work with
+    /// arbitrary output formats.
     ///
     /// Returns an iterator over (text, style) pairs. We do *not* guarantee that the
     /// representation is minimal (in that it's possible for there to be adjacent
