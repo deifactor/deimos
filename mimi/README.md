@@ -30,6 +30,12 @@ an instance of
 [tui::style::Style](https://docs.rs/tui/0.3.0/tui/style/struct.Style.html).
 
 
+## Demo
+
+The demo binary in `src/examples/demo.rs` allows you to play around with mimi formatting. Run it like
+
+    cargo run --example demo -- -f "foo is %[bold]{\$foo}" foo=bar
+
 ## What's in a name?
 
 'Nekomimi' is the Japanese word for 'person with cat ears', with 'neko' meaning

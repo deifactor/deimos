@@ -21,6 +21,6 @@ default = []
 to_tui = []
 
 
-[[bin]]
+[[example]]
 name = "demo"
-path = "src/bin/demo.rs"
+path = "src/examples/demo.rs"
