@@ -18,18 +18,25 @@ struct Opt {
 
 fn main() -> Result<(), failure::Error> {
     let opt = Opt::from_args();
-    let formatter = opt.format.parse::<Formatter>()?;
-    let args: HashMap<String, String> = opt
-        .args
-        .iter()
-        .map(|arg| {
-            let v: Vec<&str> = arg.splitn(2, '=').collect();
-            if v.len() != 2 {
-                bail!("missing = in argument {}", arg);
-            }
-            Ok((v[0].to_owned(), v[1].to_owned()))
-        })
-        .collect::<Result<_, _>>()?;
-    println!("{}", formatter.ansi(&args));
-    Ok(())
+    match opt.format.parse::<Formatter>() {
+        Ok(formatter) => {
+            let args: HashMap<String, String> = opt
+                .args
+                .iter()
+                .map(|arg| {
+                    let v: Vec<&str> = arg.splitn(2, '=').collect();
+                    if v.len() != 2 {
+                        bail!("missing = in argument {}", arg);
+                    }
+                    Ok((v[0].to_owned(), v[1].to_owned()))
+                })
+                .collect::<Result<_, _>>()?;
+            println!("{}", formatter.ansi(&args));
+            Ok(())
+        }
+        Err(err) => {
+            println!("{}", err);
+            Err(err.into())
+        }
+    }
 }
