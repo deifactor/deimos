@@ -149,7 +149,8 @@ impl From<Modifier> for tui::style::Modifier {
 impl From<Color> for tui::style::Color {
     fn from(color: Color) -> tui::style::Color {
         match color {
-            /// tui's naming scheme is a bit weird for black/white.
+            // tui's naming scheme is a bit weird for black/white, corresponding
+            // more to what the color *looks* like.
             Color::Reset => tui::style::Color::Reset,
             Color::Black => tui::style::Color::Black,
             Color::White => tui::style::Color::Gray,
