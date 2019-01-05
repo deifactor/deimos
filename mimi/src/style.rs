@@ -4,6 +4,7 @@ use termion;
 
 /// Any formatting information that isn't foreground or background color.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[allow(missing_docs)]
 pub enum Modifier {
     Bold,
     Underline,
@@ -21,6 +22,7 @@ impl Modifier {
 
 /// Foreground or background color.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[allow(missing_docs)]
 pub enum Color {
     Reset,
     Black,
@@ -53,8 +55,13 @@ impl Color {
 /// modifications (inverse, bold, etc).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Style {
+    /// The color used to render the text. If `None`, uses whatever the
+    /// terminal's default color is.
     pub foreground: Option<Color>,
+    /// The color used to render the background. If `None`, uses whatever the
+    /// terminal's default color is.
     pub background: Option<Color>,
+    /// Any extra formatting information, such as bold/italic.
     pub modifiers: HashSet<Modifier>,
 }
 

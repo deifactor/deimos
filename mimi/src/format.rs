@@ -5,37 +5,36 @@ use maplit::hashset;
 use std::collections::HashSet;
 use std::{error, fmt, iter};
 
-/// A `Formatter` takes a bunch of key/value pairs and interpolates them into a mimi format string.
+/// A `Formatter` takes a bunch of key/value pairs and interpolates them into a
+/// mimi format string.
+///
+/// # Examples
 #[derive(Clone, Debug)]
 pub struct Formatter {
     root: parse::Node,
     keys: HashSet<String>,
 }
 
+/// An error that occurred while parsing a format string. The [`std::fmt::Display`]
+/// implementation for `ParseFormatterError` is guaranteed to produce something
+/// human-readable (i.e., not just dump a struct), but the format may change.
+/// Currently it uses pest's errors.
 #[derive(Clone, Debug)]
-pub enum ParseFormatterError {
-    FormatStringError(pest::error::Error<parse::Rule>),
-}
+pub struct ParseFormatterError(pest::error::Error<parse::Rule>);
 
 impl fmt::Display for ParseFormatterError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> fmt::Result {
-        match self {
-            ParseFormatterError::FormatStringError(e) => write!(f, "{}", e),
-        }
+        write!(f, "{}", self.0)
     }
 }
 
 impl error::Error for ParseFormatterError {
     fn description(&self) -> &str {
-        match &self {
-            ParseFormatterError::FormatStringError(_) => "format string error",
-        }
+        "format string error"
     }
 
     fn cause(&self) -> Option<&dyn error::Error> {
-        match &self {
-            ParseFormatterError::FormatStringError(e) => Some(e),
-        }
+        Some(&self.0)
     }
 }
 
@@ -105,7 +104,7 @@ impl std::str::FromStr for Formatter {
                 let keys = get_keys(&root);
                 Ok(Formatter { root, keys })
             }
-            Err(err) => Err(ParseFormatterError::FormatStringError(err)),
+            Err(err) => Err(ParseFormatterError(err)),
         }
     }
 }
