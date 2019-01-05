@@ -20,10 +20,18 @@ impl Modifier {
     }
 }
 
-/// Foreground or background color.
+/// Foreground or background color. Colors are parsed as `snake_case`, so
+/// `light_red` becomes `LightRed`, etc.
+///
+/// The names `LightBlack` seems nonsensical, but is often rendered as a sort of
+/// dark gray. Similarly, `White` is often a light gray, and `LightWhite` is a
+/// 'true' white, brighter than the normal text color in white-on-black terminal schemes.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[allow(missing_docs)]
 pub enum Color {
+    /// Indicates that the color should be the terminal's default
+    /// foreground/background color. This may be black or white depending on the
+    /// user's terminal theme.
     Reset,
     Black,
     White,
@@ -33,6 +41,14 @@ pub enum Color {
     Blue,
     Magenta,
     Cyan,
+    LightBlack,
+    LightWhite,
+    LightRed,
+    LightGreen,
+    LightYellow,
+    LightBlue,
+    LightMagenta,
+    LightCyan,
 }
 
 impl Color {
@@ -47,6 +63,14 @@ impl Color {
             Color::Blue => Box::new(termion::color::Blue),
             Color::Magenta => Box::new(termion::color::Magenta),
             Color::Cyan => Box::new(termion::color::Cyan),
+            Color::LightBlack => Box::new(termion::color::LightBlack),
+            Color::LightWhite => Box::new(termion::color::LightWhite),
+            Color::LightRed => Box::new(termion::color::LightRed),
+            Color::LightGreen => Box::new(termion::color::LightGreen),
+            Color::LightYellow => Box::new(termion::color::LightYellow),
+            Color::LightBlue => Box::new(termion::color::LightBlue),
+            Color::LightMagenta => Box::new(termion::color::LightMagenta),
+            Color::LightCyan => Box::new(termion::color::LightCyan),
         }
     }
 }
@@ -125,15 +149,24 @@ impl From<Modifier> for tui::style::Modifier {
 impl From<Color> for tui::style::Color {
     fn from(color: Color) -> tui::style::Color {
         match color {
+            /// tui's naming scheme is a bit weird for black/white.
             Color::Reset => tui::style::Color::Reset,
             Color::Black => tui::style::Color::Black,
-            Color::White => tui::style::Color::White,
+            Color::White => tui::style::Color::Gray,
             Color::Red => tui::style::Color::Red,
             Color::Green => tui::style::Color::Green,
             Color::Yellow => tui::style::Color::Yellow,
             Color::Blue => tui::style::Color::Blue,
             Color::Magenta => tui::style::Color::Magenta,
             Color::Cyan => tui::style::Color::Cyan,
+            Color::LightBlack => tui::style::Color::DarkGray,
+            Color::LightWhite => tui::style::Color::White,
+            Color::LightRed => tui::style::Color::LightRed,
+            Color::LightGreen => tui::style::Color::LightGreen,
+            Color::LightYellow => tui::style::Color::LightYellow,
+            Color::LightBlue => tui::style::Color::LightBlue,
+            Color::LightMagenta => tui::style::Color::LightMagenta,
+            Color::LightCyan => tui::style::Color::LightCyan,
         }
     }
 }

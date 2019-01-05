@@ -37,6 +37,14 @@ fn parse_color(s: &str) -> Color {
         "blue" => Color::Blue,
         "magenta" => Color::Magenta,
         "cyan" => Color::Cyan,
+        "light_black" => Color::LightBlack,
+        "light_white" => Color::LightWhite,
+        "light_red" => Color::LightRed,
+        "light_green" => Color::LightGreen,
+        "light_yellow" => Color::LightYellow,
+        "light_blue" => Color::LightBlue,
+        "light_magenta" => Color::LightMagenta,
+        "light_cyan" => Color::LightCyan,
         _ => panic!("bad parse color {}", s),
     }
 }
@@ -220,6 +228,21 @@ mod tests {
                 children: vec![Node::Literal("text".into())]
             }]
         );
+    }
+
+    #[test]
+    fn light_color() {
+        let style = Style {
+            foreground: Some(Color::LightRed),
+            background: Some(Color::LightGreen),
+            ..Style::default()
+        };
+        assert_eq!(
+            children("%[light_red, bg_light_green]{foo}"),
+            vec![Node::Formatted {
+                style,
+                children: vec![Node::Literal("foo".into())]
+            }])
     }
 
     #[test]

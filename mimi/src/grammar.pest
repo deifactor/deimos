@@ -6,7 +6,8 @@ literal = { (raw_literal | escape_sequence)+ }
 identifier = {ASCII_ALPHANUMERIC+}
 variable = {"$" ~ (identifier | "{" ~ identifier ~ "}")}
 
-color = { ^"black" | ^"white" | ^"red" | ^"green" | ^"yellow" | ^"blue" | ^"magenta" | ^"cyan" }
+base_color = _{ ^"black" | ^"white" | ^"red" | ^"green" | ^"yellow" | ^"blue" | ^"magenta" | ^"cyan" }
+color = { "light_"? ~ base_color }
 fg_color = { color }
 bg_color = { "bg_" ~ color }
 modifier = { ^"bold" | ^"underline" }

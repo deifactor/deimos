@@ -13,9 +13,12 @@ a variable named 'foo' followed immediately by the literal `bar`.
 A styled section looks like `%[bold]{blah $foo blah}`. The style information
 goes between the square brackets. Valid style names are:
 * the colors `black`, `white`, `red`, `green`, `yellow`, `blue`, `magenta`,
-  `cyan`, which indicate the color of the corresponding text.
-* any color with `bg_` prefixed (for example, `bg_yellow`), which sets the
-  background color.
+  `cyan`, as well as `light_black`, `light_white`, etc., which indicate the
+  color of the corresponding text.
+* any color with `bg_` prefixed (for example, `bg_yellow`, `bg_light_blue`),
+  which sets the background color.
+* `reset` and `bg_reset`, which set the foreground/background color to the
+  terminal's default.
 * `bold` and `underline`.
 
 You can have multiple styles in a style section, so `%[bold, red, bg_blue]{foo
