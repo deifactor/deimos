@@ -2,7 +2,7 @@ use crate::parse;
 use crate::parse::Node;
 use crate::style::Style;
 use maplit::hashset;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::{error, fmt, iter};
 
 #[derive(Clone, Debug)]
