@@ -7,8 +7,6 @@ use std::{error, fmt, iter};
 
 /// A `Formatter` takes a bunch of key/value pairs and interpolates them into a
 /// mimi format string.
-///
-/// # Examples
 #[derive(Clone, Debug)]
 pub struct Formatter {
     root: parse::Node,
@@ -40,6 +38,15 @@ impl error::Error for ParseFormatterError {
 
 impl Formatter {
     /// The names of all the variables in the format string.
+    ///
+    /// # Examples
+    /// ```
+    /// # use maplit::hashset;
+    /// # use std::collections::HashSet;
+    /// let formatter: mimi::Formatter = "$foo $foo ${bar}baz".parse().unwrap();
+    /// let expected: HashSet<String> = hashset!["foo".into(), "bar".into()];
+    /// assert_eq!(formatter.keys(), &expected);
+    /// ```
     pub fn keys(&self) -> &HashSet<String> {
         &self.keys
     }
@@ -60,6 +67,24 @@ impl Formatter {
     /// Returns an iterator over (text, style) pairs. We do *not* guarantee that the
     /// representation is minimal (in that it's possible for there to be adjacent
     /// pairs with identical styles).
+    ///
+    /// # Examples
+    /// ```
+    /// use std::collections::HashMap;
+    /// let formatter: mimi::Formatter = "lit %[red]{fmt} $var".parse().unwrap();
+    /// let mut values = HashMap::new();
+    /// values.insert("var", "value".to_owned());
+    /// let spans: Vec<_> = formatter.spans(&values).collect();
+    /// let red = mimi::Style { foreground: Some(mimi::Color::Red), ..mimi::Style::default() };
+    ///
+    /// assert_eq!(spans, vec![
+    ///   ("lit ".into(), mimi::Style::default()),
+    ///   ("fmt".into(), red),
+    ///   // Note that the next two might get merge in some future version.
+    ///   (" ".into(), mimi::Style::default()),
+    ///   ("value".into(), mimi::Style::default()),
+    /// ]);
+    /// ```
     pub fn spans<'a, M: std::ops::Index<&'a str, Output = String>>(
         &'a self,
         values: &M,
