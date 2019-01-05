@@ -9,7 +9,7 @@ maplit = "^1.0"
 pest = "^2.1"
 pest_derive = "^2.1"
 termion = "^1.5"
-tui = "0.3"
+tui = { version = "0.3", optional = true }
 
 [dev-dependencies]
 # Necessary for the demo binary.
@@ -18,7 +18,7 @@ structopt = "0.2"
 
 [features]
 default = []
-to_tui = []
+to_tui = ["tui"]
 
 
 [[example]]
