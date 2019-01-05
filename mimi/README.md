@@ -4,6 +4,8 @@
 program is formatted. The main usecase is for the `catgirl` command-line `mpd`
 client, but of course other uses are welcome.
 
+![A demo of mimi formatting](/example.png?raw=true)
+
 ## Syntax
 
 Variables are included using shell-like `$foo` syntax. Variable names can
