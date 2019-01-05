@@ -17,7 +17,7 @@
 extern crate pest_derive;
 
 pub use crate::format::{Formatter, ParseFormatterError};
-pub use crate::style::{Modifier, Color, Style};
+pub use crate::style::{Color, Modifier, Style};
 
 mod format;
 mod parse;
