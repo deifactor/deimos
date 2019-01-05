@@ -82,7 +82,7 @@ pub fn parse(input: &str) -> Result<Node, pest::error::Error<Rule>> {
 fn build_nodes(pairs: pest::iterators::Pairs<Rule>) -> Vec<Node> {
     pairs
         .filter_map(|pair| match pair.as_rule() {
-            Rule::literal => Some(Node::Literal(pair.as_str().to_owned())),
+            Rule::literal => Some(Node::Literal(unescape_literal(pair))),
             Rule::variable => Some(Node::Variable(
                 pair.into_inner().next().unwrap().as_str().to_owned(),
             )),
@@ -93,6 +93,18 @@ fn build_nodes(pairs: pest::iterators::Pairs<Rule>) -> Vec<Node> {
                 Node::Formatted { style, children }
             }),
             Rule::EOI => None,
+            _ => panic!("Unexpected pair {:?}", pair),
+        })
+        .collect()
+}
+
+/// Takes the `Pair` corresponding to the `literal` rule and removes any
+/// included escape sequences.
+fn unescape_literal(pair: pest::iterators::Pair<Rule>) -> String {
+    pair.into_inner()
+        .map(|pair| match pair.as_rule() {
+            Rule::raw_literal => pair.as_str(),
+            Rule::needs_escape => pair.as_str(),
             _ => panic!("Unexpected pair {:?}", pair),
         })
         .collect()
@@ -148,6 +160,36 @@ mod tests {
             children("${foo}bar"),
             vec![Node::Variable("foo".into()), Node::Literal("bar".into())]
         )
+    }
+
+    #[test]
+    fn square_braces_dont_need_escape() {
+        assert_eq!(children("[foo]"), vec![Node::Literal("[foo]".into())])
+    }
+
+    #[test]
+    fn curly_braces_need_escape() {
+        assert!(parse("{foo}").is_err());
+    }
+
+    #[test]
+    fn escaped_variable() {
+        assert_eq!(children("\\$foo"), vec![Node::Literal("$foo".into())])
+    }
+
+    #[test]
+    fn escaped_closing_brace() {
+        let style = Style {
+            foreground: Some(Color::Red),
+            ..Style::default()
+        };
+        assert_eq!(
+            children("%[red]{foo\\}bar}"),
+            vec![Node::Formatted {
+                style,
+                children: vec![Node::Literal("foo}bar".into())]
+            }]
+        );
     }
 
     #[test]

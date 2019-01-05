@@ -1,4 +1,7 @@
-literal = {(!("$" | "%" | "{" | "}") ~ ANY)+}
+raw_literal = { (!needs_escape ~ ANY)+ }
+needs_escape = { "$" | "%" | "\\" | "{" | "}" }
+escape_sequence = _{ "\\" ~ needs_escape }
+literal = { (raw_literal | escape_sequence)+ }
 
 identifier = {ASCII_ALPHANUMERIC+}
 variable = {"$" ~ (identifier | "{" ~ identifier ~ "}")}
