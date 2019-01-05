@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/deifactor/catgirl.svg?branch=mistress)](https://travis-ci.org/deifactor/catgirl)
+[![Crate version](https://img.shields.io/crates/v/mimi.svg)](https://crates.io/crates/mimi)
 
 `mimi` is a library for allowing the user to control how part of a terminal
 program is formatted. The main usecase is for the `catgirl` command-line `mpd`
