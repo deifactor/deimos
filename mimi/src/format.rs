@@ -63,7 +63,7 @@ impl Formatter {
     pub fn spans<'a, M: std::ops::Index<&'a str, Output = String>>(
         &'a self,
         values: &M,
-    ) -> Box<Iterator<Item = (String, Style)>> {
+    ) -> Box<dyn Iterator<Item = (String, Style)>> {
         Formatter::spans_impl(&self.root, values, Style::default())
     }
 
@@ -71,7 +71,7 @@ impl Formatter {
         root: &'a parse::Node,
         values: &M,
         base: Style,
-    ) -> Box<Iterator<Item = (String, Style)>> {
+    ) -> Box<dyn Iterator<Item = (String, Style)>> {
         match root {
             Node::Literal(s) => Box::new(iter::once((s.clone(), base.clone()))),
             Node::Variable(key) => Box::new(iter::once((values[key].clone(), base.clone()))),

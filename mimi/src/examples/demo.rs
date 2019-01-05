@@ -1,7 +1,7 @@
-extern crate structopt;
 use failure::bail;
 use mimi::Formatter;
 use std::collections::HashMap;
+use structopt;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]

@@ -36,7 +36,7 @@ pub enum Color {
 }
 
 impl Color {
-    fn termion(self) -> Box<termion::color::Color> {
+    fn termion(self) -> Box<dyn termion::color::Color> {
         match self {
             Color::Reset => Box::new(termion::color::Reset),
             Color::Black => Box::new(termion::color::Black),
