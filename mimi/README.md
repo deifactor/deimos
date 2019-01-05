@@ -1,4 +1,4 @@
-# mimi, a simple markup language for TUIs
+[![Build Status](https://travis-ci.org/deifactor/catgirl.svg?branch=mistress)](https://travis-ci.org/deifactor/catgirl)
 
 `mimi` is a library for allowing the user to control how part of a terminal
 program is formatted. The main usecase is for the `catgirl` command-line `mpd`
