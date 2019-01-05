@@ -1,6 +1,6 @@
 //! This crate provides run-time string interpolation using key/value pairs,
 //! oriented towards support for terminal applications. For documentation on the
-//! format of mimi strings, see the README.md or the `parse` module.
+//! format of mimi strings, see the README.md.
 //!
 //! # Examples
 //!
