@@ -4,7 +4,9 @@ mod widgets;
 
 use failure;
 use mpd;
+use std::fs::File;
 use std::io;
+use std::io::prelude::*;
 use termion::raw::IntoRawMode;
 use termion::screen::AlternateScreen;
 use tui;
@@ -18,6 +20,15 @@ struct App {
 }
 
 fn main() -> Result<(), failure::Error> {
+    let config: config::Config = {
+        let path = config::config_path().expect("Couldn't determine path to the config file");
+        let mut buf = String::new();
+        File::open(path)?.read_to_string(&mut buf)?;
+        buf.parse()?
+    };
+
+    let mut conn = mpd::Client::connect("127.0.0.1:6600").expect("failed to connect to MPD");
+
     let stdout = io::stdout().into_raw_mode()?;
     let stdout = termion::input::MouseTerminal::from(stdout);
     let stdout = AlternateScreen::from(stdout);
@@ -27,8 +38,6 @@ fn main() -> Result<(), failure::Error> {
         size: terminal.size()?,
     };
     terminal.hide_cursor()?;
-
-    let mut conn = mpd::Client::connect("127.0.0.1:6600").expect("failed to connect to MPD");
 
     let receiver = events::EventReceiver::new(events::Config::default());
     loop {
@@ -46,14 +55,20 @@ fn main() -> Result<(), failure::Error> {
                 .direction(layout::Direction::Vertical)
                 .constraints(vec![Constraint::Min(4), Constraint::Length(1)])
                 .split(app.size);
-            let mut now_playing = widgets::NowPlaying::new(song, status.elapsed, status.state);
+            let mut now_playing = widgets::NowPlaying::new(
+                song,
+                status.elapsed,
+                status.state,
+                config.format.now_playing.clone(),
+            );
             now_playing.render(&mut f, layout[1]);
 
             let mut queue_block = tui_widgets::Block::default()
                 .title("Queue")
                 .borders(tui_widgets::Borders::ALL);
             queue_block.render(&mut f, layout[0]);
-            widgets::Queue::new(queue, pos).render(&mut f, queue_block.inner(layout[0]));
+            widgets::Queue::new(queue, pos, config.format.playlist_song.clone())
+                .render(&mut f, queue_block.inner(layout[0]));
         })?;
         if let events::Event::Input(termion::event::Event::Key(termion::event::Key::Char('q'))) =
             receiver.next()?

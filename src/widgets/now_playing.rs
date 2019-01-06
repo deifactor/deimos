@@ -1,6 +1,5 @@
 use maplit::hashmap;
 use mpd::song::Song;
-use std::collections::HashMap;
 use time::Duration;
 use tui;
 use tui::widgets::Widget;
@@ -10,6 +9,7 @@ pub struct NowPlaying {
     song: Option<Song>,
     elapsed: Option<Duration>,
     state: mpd::status::State,
+    formatter: mimi::Formatter,
 }
 
 impl NowPlaying {
@@ -17,11 +17,13 @@ impl NowPlaying {
         song: Option<Song>,
         elapsed: Option<Duration>,
         state: mpd::status::State,
+        formatter: mimi::Formatter,
     ) -> NowPlaying {
         NowPlaying {
             song,
             elapsed,
             state,
+            formatter,
         }
     }
 }
@@ -46,11 +48,8 @@ impl Widget for NowPlaying {
                 "artist" => song.tags.get("Artist").cloned().unwrap_or("Unknown".to_owned()),
                 "album" => song.tags.get("Album").cloned().unwrap_or("Unknown".to_owned()),
             ];
-            let formatter: mimi::Formatter =
-                "%[red]{$title} - %[green]{$artist} - %[blue]{$album}"
-                    .parse()
-                    .unwrap();
-            let texts: Vec<_> = formatter
+            let texts: Vec<_> = self
+                .formatter
                 .spans(&values)
                 .map(|(text, style)| tui::widgets::Text::styled(text, style.into()))
                 .collect();
