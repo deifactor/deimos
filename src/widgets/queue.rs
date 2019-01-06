@@ -34,11 +34,12 @@ impl Widget for Queue {
                     "album" => song.tags.get("Album").cloned().unwrap_or("Unknown".to_owned()),
                 ];
                 let now_playing_display = if Some(index as u32) == self.position {
-                    vec![((("> ").to_owned(), mimi::Style::default()))].into_iter()
+                    Some((("> ").to_owned(), mimi::Style::default()))
                 } else {
-                    vec![].into_iter()
+                    None
                 };
                 now_playing_display
+                    .into_iter()
                     .chain(self.formatter.spans(&values))
                     .chain(iter::once(("\n".into(), mimi::Style::default())))
             })
