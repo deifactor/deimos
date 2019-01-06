@@ -70,6 +70,7 @@ mod raw {
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "kebab-case")]
     pub(super) struct Config {
+        #[serde(default)]
         pub format: Format,
     }
 
@@ -79,6 +80,13 @@ mod raw {
         #[serde(default = "default_playlist_song")]
         pub playlist_song: String,
         pub now_playing: Option<String>,
+    }
+
+    impl Default for Format {
+        // XXX: is there a better way to do this?
+        fn default() -> Format {
+            toml::from_str("").unwrap()
+        }
     }
 
     fn default_playlist_song() -> String {
@@ -102,7 +110,21 @@ mod tests {
     }
 
     #[test]
-    pub fn now_playing_defaults_to_playlist_song() {
+    fn empty_config_is_valid() {
+        "".parse::<Config>().unwrap();
+    }
+
+    #[test]
+    fn empty_tables_are_valid() {
+        r#"
+[format]
+"#
+        .parse::<Config>()
+        .unwrap();
+    }
+
+    #[test]
+    fn now_playing_defaults_to_playlist_song() {
         let config: Config = r#"
 [format]
 playlist-song = "np: $title by $artist from $album"
@@ -116,7 +138,7 @@ playlist-song = "np: $title by $artist from $album"
     }
 
     #[test]
-    pub fn now_playing_can_override_playlist_song() {
+    fn now_playing_can_override_playlist_song() {
         let config: Config = r#"
 [format]
 playlist-song = "np: $title by $artist from $album"
