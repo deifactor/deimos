@@ -1,3 +1,4 @@
+mod config;
 mod events;
 mod widgets;
 
