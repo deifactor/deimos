@@ -146,9 +146,9 @@ now-playing = "$album - $artist - $title"
 "#
         .parse()
         .unwrap();
-        assert_ne!(
-            config.format.now_playing.ansi(&test_keys()),
-            config.format.playlist_song.ansi(&test_keys()),
+        assert_eq!(
+            config.format.now_playing.plain(&test_keys()),
+            "Their Worst Album - Some Artist - The One Good Song".to_owned()
         );
     }
 }

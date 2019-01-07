@@ -51,6 +51,11 @@ impl Formatter {
         &self.keys
     }
 
+    /// Formats the given values as a string. Useful for tests.
+    pub fn plain<'a, M: std::ops::Index<&'a str, Output = String>>(&'a self, values: &M) -> String {
+        self.spans(values).map(|(text,  _)| text).collect()
+    }
+
     /// Formats the given values using ANSI terminal codes.
     pub fn ansi<'a, M: std::ops::Index<&'a str, Output = String>>(&'a self, values: &M) -> String {
         self.spans(values)
