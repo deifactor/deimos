@@ -1,4 +1,4 @@
-use maplit::hashmap;
+use crate::widgets;
 use mpd::song::Song;
 use std::iter;
 use tui;
@@ -28,11 +28,6 @@ impl Widget for Queue {
             .iter()
             .enumerate()
             .flat_map(|(index, song)| {
-                let values = hashmap![
-                    "title" => song.title.clone().unwrap_or("Unknown".to_owned()),
-                    "artist" => song.tags.get("Artist").cloned().unwrap_or("Unknown".to_owned()),
-                    "album" => song.tags.get("Album").cloned().unwrap_or("Unknown".to_owned()),
-                ];
                 let now_playing_display = if Some(index as u32) == self.position {
                     Some((("> ").to_owned(), mimi::Style::default()))
                 } else {
@@ -40,7 +35,7 @@ impl Widget for Queue {
                 };
                 now_playing_display
                     .into_iter()
-                    .chain(self.formatter.spans(&values))
+                    .chain(self.formatter.spans(&widgets::song_values(song)))
                     .chain(iter::once(("\n".into(), mimi::Style::default())))
             })
             .map(|(text, style)| tui::widgets::Text::styled(text, style.into()));

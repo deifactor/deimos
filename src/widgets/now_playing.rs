@@ -1,4 +1,4 @@
-use maplit::hashmap;
+use crate::widgets;
 use mpd::song::Song;
 use time::Duration;
 use tui;
@@ -43,14 +43,9 @@ impl Widget for NowPlaying {
                     tui::style::Style::default(),
                 )
             }
-            let values = hashmap![
-                "title" => song.title.clone().unwrap_or("Unknown".to_owned()),
-                "artist" => song.tags.get("Artist").cloned().unwrap_or("Unknown".to_owned()),
-                "album" => song.tags.get("Album").cloned().unwrap_or("Unknown".to_owned()),
-            ];
             let texts: Vec<_> = self
                 .formatter
-                .spans(&values)
+                .spans(&widgets::song_values(&song))
                 .map(|(text, style)| tui::widgets::Text::styled(text, style.into()))
                 .collect();
             tui::widgets::Paragraph::new(texts.iter()).draw(area, buf);
