@@ -7,6 +7,7 @@ use mpd;
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
+use structopt::StructOpt;
 use termion::raw::IntoRawMode;
 use termion::screen::AlternateScreen;
 use tui;
@@ -15,11 +16,24 @@ use tui::layout::Constraint;
 use tui::widgets as tui_widgets;
 use tui::widgets::Widget;
 
+#[derive(StructOpt, Debug)]
+#[structopt(name = "catgirl")]
+struct Opt {
+    /// The host to connect to.
+    #[structopt(short = "h", long = "host", default_value = "localhost")]
+    host: String,
+
+    /// The port to connect on.
+    #[structopt(short = "p", long = "port", default_value = "6600")]
+    port: u16,
+}
+
 struct App {
     size: layout::Rect,
 }
 
 fn main() -> Result<(), failure::Error> {
+    let opt = Opt::from_args();
     let config: config::Config = {
         let path = config::config_path().expect("Couldn't determine path to the config file");
         let mut buf = String::new();
@@ -27,7 +41,8 @@ fn main() -> Result<(), failure::Error> {
         buf.parse()?
     };
 
-    let mut conn = mpd::Client::connect("127.0.0.1:6600").expect("failed to connect to MPD");
+    let mut conn =
+        mpd::Client::connect((opt.host.as_str(), opt.port)).expect("failed to connect to MPD");
 
     let stdout = io::stdout().into_raw_mode()?;
     let stdout = termion::input::MouseTerminal::from(stdout);
