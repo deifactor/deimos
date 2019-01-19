@@ -28,10 +28,6 @@ struct Opt {
     port: u16,
 }
 
-struct App {
-    size: layout::Rect,
-}
-
 fn main() -> Result<(), failure::Error> {
     let opt = Opt::from_args();
     let config: config::Config = {
@@ -49,42 +45,32 @@ fn main() -> Result<(), failure::Error> {
     let stdout = AlternateScreen::from(stdout);
     let backend = tui::backend::TermionBackend::new(stdout);
     let mut terminal = tui::Terminal::new(backend)?;
-    let mut app = App {
-        size: terminal.size()?,
-    };
+    let mut size = terminal.size()?;
     terminal.hide_cursor()?;
 
     let receiver = events::EventReceiver::new(events::Config::default());
     loop {
-        let size = terminal.size()?;
-        if size != app.size {
-            terminal.resize(size)?;
-            app.size = size;
+        {
+            let new_size = terminal.size()?;
+            if size != new_size {
+                terminal.resize(new_size)?;
+                size = new_size;
+            }
         }
         let song = conn.currentsong().expect("failed to get song");
         let status = conn.status().expect("failed to get status");
         let queue = conn.queue().expect("failed to get queue");
         let pos = song.as_ref().and_then(|song| Some(song.place?.pos));
-        terminal.draw(|mut f| {
-            let layout = layout::Layout::default()
-                .direction(layout::Direction::Vertical)
-                .constraints(vec![Constraint::Min(4), Constraint::Length(1)])
-                .split(app.size);
-            let mut now_playing = widgets::NowPlaying::new(
-                song,
-                status.elapsed,
-                status.state,
-                config.format.now_playing.clone(),
-            );
-            now_playing.render(&mut f, layout[1]);
-
-            let mut queue_block = tui_widgets::Block::default()
-                .title("Queue")
-                .borders(tui_widgets::Borders::ALL);
-            queue_block.render(&mut f, layout[0]);
-            widgets::Queue::new(queue, pos, config.format.playlist_song.clone())
-                .render(&mut f, queue_block.inner(layout[0]));
-        })?;
+        let queue = widgets::Queue::new(queue, pos, config.format.playlist_song.clone());
+        let now_playing = widgets::NowPlaying::new(
+            song,
+            status.elapsed,
+            status.state,
+            config.format.now_playing.clone(),
+        );
+        terminal
+            .draw(|mut f| widgets::App::new(size, queue, now_playing).render(&mut f, size))
+            .expect("failed to draw");
         if let events::Event::Input(termion::event::Event::Key(termion::event::Key::Char('q'))) =
             receiver.next()?
         {

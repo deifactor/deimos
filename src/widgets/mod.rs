@@ -1,8 +1,10 @@
+mod app;
 mod now_playing;
 mod queue;
 
 use maplit::hashmap;
 
+pub use self::app::App;
 pub use self::now_playing::NowPlaying;
 pub use self::queue::Queue;
 
