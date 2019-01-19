@@ -22,7 +22,8 @@ goes between the square brackets. Valid style names are:
   which sets the background color.
 * `reset` and `bg_reset`, which set the foreground/background color to the
   terminal's default.
-* `bold` and `underline`.
+* `bold`, `underline`, `reverse`. Note that if you have two `reverse` styles,
+  they will *not* cancel each other out.
 
 You can have multiple styles in a style section, so `%[bold, red, bg_blue]{foo
 bar baz}` is valid, if eye-searing. Style sections can nest.

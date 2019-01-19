@@ -21,6 +21,7 @@ fn parse_modifier(s: &str) -> Modifier {
     match s {
         "bold" => Modifier::Bold,
         "underline" => Modifier::Underline,
+        "reverse" => Modifier::Reverse,
         _ => panic!("bad modifier {}", s),
     }
 }

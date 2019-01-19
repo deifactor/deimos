@@ -8,6 +8,7 @@ use termion;
 pub enum Modifier {
     Bold,
     Underline,
+    Reverse
 }
 
 impl Modifier {
@@ -16,6 +17,7 @@ impl Modifier {
         match self {
             Modifier::Bold => format!("{}", termion::style::Bold),
             Modifier::Underline => format!("{}", termion::style::Underline),
+            Modifier::Reverse => format!("{}", termion::style::Invert),
         }
     }
 }
@@ -141,6 +143,7 @@ impl From<Modifier> for tui::style::Modifier {
         match modifier {
             Modifier::Bold => tui::style::Modifier::Bold,
             Modifier::Underline => tui::style::Modifier::Underline,
+            Modifier::Reverse => tui::style::Modifier::Invert,
         }
     }
 }
