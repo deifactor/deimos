@@ -1,9 +1,11 @@
+mod album_tree;
 mod app;
 mod now_playing;
 mod queue;
 
 use maplit::hashmap;
 
+pub use self::album_tree::AlbumTree;
 pub use self::app::App;
 pub use self::now_playing::NowPlaying;
 pub use self::queue::Queue;
