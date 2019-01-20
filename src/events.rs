@@ -45,11 +45,9 @@ impl EventReceiver {
         // Start sending tick events.
         {
             let tx = tx.clone();
-            thread::spawn(move || {
-                loop {
-                    tx.send(Event::Tick);
-                    thread::sleep(config.tick_duration);
-                }
+            thread::spawn(move || loop {
+                tx.send(Event::Tick);
+                thread::sleep(config.tick_duration);
             });
         }
         EventReceiver { rx }
