@@ -57,3 +57,7 @@ impl EventReceiver {
         self.rx.recv()
     }
 }
+
+pub trait EventHandler {
+    fn handle_event(&mut self, event: &Event);
+}

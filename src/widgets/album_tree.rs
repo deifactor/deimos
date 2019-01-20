@@ -1,3 +1,4 @@
+use crate::events;
 use std::collections::HashMap;
 
 /// Lists all of the albums in the user's library in tree form.
@@ -62,6 +63,10 @@ impl AlbumTree {
         }
         Ok(())
     }
+}
+
+impl events::EventHandler for AlbumTree {
+    fn handle_event(&mut self, events: &events::Event) {}
 }
 
 impl tui::widgets::Widget for AlbumTree {

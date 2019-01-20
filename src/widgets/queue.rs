@@ -1,3 +1,4 @@
+use crate::events;
 use crate::widgets;
 use mpd::song::Song;
 use std::iter;
@@ -19,6 +20,11 @@ impl Queue {
             formatter,
         }
     }
+}
+
+// TODO
+impl events::EventHandler for Queue {
+    fn handle_event(&mut self, events: &events::Event) {}
 }
 
 impl Widget for Queue {

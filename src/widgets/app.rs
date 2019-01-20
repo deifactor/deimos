@@ -1,3 +1,4 @@
+use crate::events;
 use crate::widgets;
 use tui;
 use tui::layout;
@@ -40,6 +41,26 @@ impl App {
             Screen::Queue => Box::new(&mut self.queue),
             Screen::Albums => Box::new(&mut self.album_tree),
         }
+    }
+
+    fn active_handler(&mut self) -> Box<&mut dyn events::EventHandler> {
+        match self.screen {
+            Screen::Queue => Box::new(&mut self.queue),
+            Screen::Albums => Box::new(&mut self.album_tree),
+        }
+    }
+}
+
+impl events::EventHandler for App {
+    fn handle_event(&mut self, event: &events::Event) {
+        if let Some(termion::event::Key::Char(c)) = event.key() {
+            match c {
+                '1' => self.screen = Screen::Queue,
+                '2' => self.screen = Screen::Albums,
+                _ => (),
+            }
+        }
+        self.active_handler().handle_event(event);
     }
 }
 
