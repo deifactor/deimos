@@ -42,7 +42,7 @@ impl AlbumTree {
         }
         self.selected = match self.selected {
             None => Some(self.rows.len() - 1),
-            Some(n) => Some(std::cmp::max(n - 1, 0)),
+            Some(n) => Some((n - 1).max(0))
         }
     }
 
@@ -53,7 +53,7 @@ impl AlbumTree {
         }
         self.selected = match self.selected {
             None => Some(0),
-            Some(n) => Some(std::cmp::min(n + 1, self.rows.len())),
+            Some(n) => Some((self.rows.len() - 1).min(n + 1))
         }
     }
 
@@ -99,6 +99,17 @@ impl AlbumTree {
             }
         }
     }
+
+    /// Computes the row index to start drawing from. The offset is set so that
+    /// the selected item is as close to the center as possible. `height` is the
+    /// height of the region we're drawing into.
+    fn draw_start_row(&self, height: usize) -> usize {
+        if let Some(selected) = self.selected {
+            (selected - (height / 2).min(selected)).min(self.rows.len() - height)
+        } else {
+            0
+        }
+    }
 }
 
 impl events::EventHandler for AlbumTree {
@@ -117,11 +128,13 @@ impl events::EventHandler for AlbumTree {
 
 impl tui::widgets::Widget for AlbumTree {
     fn draw(&mut self, area: tui::layout::Rect, buf: &mut tui::buffer::Buffer) {
+        let draw_start = self.draw_start_row(area.height as usize);
         for (i, (album_artist, album)) in self
             .rows
             .iter()
             .by_ref()
             .enumerate()
+            .skip(self.draw_start_row(area.height as usize))
             .take(area.height as usize)
         {
             let style = if Some(i) == self.selected {
@@ -136,7 +149,7 @@ impl tui::widgets::Widget for AlbumTree {
             self.background(&area, buf, tui::style::Color::Reset);
             buf.set_stringn(
                 area.left(),
-                area.top() + i as u16,
+                (area.top() as usize + i - draw_start) as u16,
                 text,
                 area.width as usize,
                 style,
