@@ -82,9 +82,7 @@ fn main() -> Result<(), failure::Error> {
                 app.render(&mut f, size)
             })
             .expect("failed to draw");
-        if let events::Event::Input(termion::event::Event::Key(termion::event::Key::Char(c))) =
-            receiver.next()?
-        {
+        if let Some(termion::event::Key::Char(c)) = receiver.next()?.key() {
             match c {
                 'q' => break,
                 '1' => screen = widgets::app::Screen::Queue,

@@ -9,6 +9,18 @@ pub enum Event {
     Tick,
 }
 
+impl Event {
+    /// If this event is a key, returns the inner [termion::event::Event::Key].
+    /// Otherwise, returns `None`.
+    pub fn key(&self) -> Option<&termion::event::Key> {
+        if let Event::Input(termion::event::Event::Key(ref k)) = self {
+            Some(k)
+        } else {
+            None
+        }
+    }
+}
+
 /// Configures how Event
 pub struct Config {
     pub tick_duration: Duration,
