@@ -16,34 +16,30 @@ pub enum Screen {
 /// This is the top-level widget that renders the entire app. `main.rs` handles
 /// all of the terminal and connection setup.
 pub struct App<'a> {
-    size: tui::layout::Rect,
     pub screen: Screen,
     queue: widgets::Queue<'a>,
     album_tree: widgets::AlbumTree,
     song: Option<mpd::Song>,
     status: mpd::Status,
-    client: Rc<RefCell<mpd::Client>>,
-    config: &'a config::Config
+    config: &'a config::Config,
 }
 
 impl App<'_> {
     pub fn new(
-        size: tui::layout::Rect,
         client: Rc<RefCell<mpd::Client>>,
-        config: &config::Config
+        config: &config::Config,
     ) -> App {
-        let album_artists = client.borrow_mut()
+        let album_artists = client
+            .borrow_mut()
             .list(&mpd::Term::Tag("AlbumArtist".into()), &mpd::Query::new())
             .expect("failed to list album artists");
         App {
-            size,
             screen: Screen::Queue,
             queue: widgets::Queue::new(&config.format.playlist_song),
             album_tree: widgets::AlbumTree::new(album_artists, client.clone()),
             song: None,
             status: Default::default(),
-            client,
-            config
+            config,
         }
     }
 
@@ -67,7 +63,8 @@ impl App<'_> {
 
     pub fn set_song(&mut self, song: Option<mpd::Song>) {
         self.song = song;
-        self.queue.set_position(self.song.as_ref().and_then(|song| Some(song.place?.pos)));
+        self.queue
+            .set_position(self.song.as_ref().and_then(|song| Some(song.place?.pos)));
     }
     pub fn set_status(&mut self, status: mpd::Status) {
         self.status = status
@@ -78,8 +75,14 @@ impl events::EventHandler for App<'_> {
     fn handle_event(&mut self, event: &events::Event) {
         if let Some(termion::event::Key::Char(c)) = event.key() {
             match c {
-                '1' => self.screen = Screen::Queue,
-                '2' => self.screen = Screen::Albums,
+                '1' => {
+                    self.screen = Screen::Queue;
+                    return;
+                }
+                '2' => {
+                    self.screen = Screen::Albums;
+                    return;
+                }
                 _ => (),
             }
         }
@@ -104,7 +107,8 @@ impl Widget for App<'_> {
         widgets::NowPlaying {
             song: &self.song,
             status: &self.status,
-            formatter: &self.config.format.now_playing
-        }.draw(layout[1], buf);
+            formatter: &self.config.format.now_playing,
+        }
+        .draw(layout[1], buf);
     }
 }

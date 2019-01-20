@@ -13,9 +13,6 @@ use structopt::StructOpt;
 use termion::raw::IntoRawMode;
 use termion::screen::AlternateScreen;
 use tui;
-use tui::layout;
-use tui::layout::Constraint;
-use tui::widgets as tui_widgets;
 use tui::widgets::Widget;
 
 #[derive(StructOpt, Debug)]
@@ -50,7 +47,7 @@ fn main() -> Result<(), failure::Error> {
     let mut screen = widgets::app::Screen::Queue;
 
     let client = Rc::new(RefCell::new(mpd::Client::connect((opt.host.as_str(), opt.port)).expect("failed to connect to MPD")));
-    let mut app = widgets::App::new(size, client.clone(), &config);
+    let mut app = widgets::App::new(client.clone(), &config);
 
     let receiver = events::EventReceiver::new(events::Config::default());
     loop {

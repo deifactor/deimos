@@ -69,7 +69,7 @@ impl AlbumTree {
 }
 
 impl events::EventHandler for AlbumTree {
-    fn handle_event(&mut self, events: &events::Event) {}
+    fn handle_event(&mut self, _events: &events::Event) {}
 }
 
 impl tui::widgets::Widget for AlbumTree {

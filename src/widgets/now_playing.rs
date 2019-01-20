@@ -1,6 +1,5 @@
 use crate::widgets;
-use mpd::{Song, Status};
-use time::Duration;
+use mpd::Song;
 use tui;
 use tui::widgets::Widget;
 
