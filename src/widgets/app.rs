@@ -66,8 +66,16 @@ impl App<'_> {
         self.queue
             .set_position(self.song.as_ref().and_then(|song| Some(song.place?.pos)));
     }
+
     pub fn set_status(&mut self, status: mpd::Status) {
         self.status = status
+    }
+
+    pub fn screen_title(&self) -> String {
+        match self.screen {
+            Screen::Queue => "Queue".into(),
+            Screen::Albums => "Albums".into()
+        }
     }
 }
 
@@ -99,8 +107,11 @@ impl Widget for App<'_> {
                 layout::Constraint::Length(1),
             ])
             .split(area);
+        // XXX: The ─ is necessary because tui glitches if the first redraw is
+        // at (1, 0). Can remove when tui 0.3.1 lands.
+        let title = format!("─{}", self.screen_title());
         let mut queue_block = tui::widgets::Block::default()
-            .title("Queue")
+            .title(&title)
             .borders(tui::widgets::Borders::ALL);
         queue_block.draw(layout[0], buf);
         self.active_widget().draw(queue_block.inner(layout[0]), buf);
