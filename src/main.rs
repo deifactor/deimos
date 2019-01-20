@@ -45,7 +45,9 @@ fn main() -> Result<(), failure::Error> {
     let mut size = terminal.size()?;
     terminal.hide_cursor()?;
 
-    let client = Rc::new(RefCell::new(mpd::Client::connect((opt.host.as_str(), opt.port)).expect("failed to connect to MPD")));
+    let client = Rc::new(RefCell::new(
+        mpd::Client::connect((opt.host.as_str(), opt.port)).expect("failed to connect to MPD"),
+    ));
     let mut app = widgets::App::new(client.clone(), &config);
 
     let receiver = events::EventReceiver::new(events::Config::default());
@@ -57,21 +59,23 @@ fn main() -> Result<(), failure::Error> {
                 size = new_size;
             }
         }
-        let song = client.borrow_mut().currentsong().expect("failed to get song");
-        let status = client.borrow_mut().status().expect("failed to get status");
-        let queue = client.borrow_mut().queue().expect("failed to get queue");
 
         terminal
-            .draw(|mut f| {
-                app.set_song(song);
-                app.set_status(status);
-                app.set_song_queue(queue);
-                app.render(&mut f, size)
-            })
+            .draw(|mut f| app.render(&mut f, size))
             .expect("failed to draw");
         let event = receiver.next()?;
         if event.key() == Some(&termion::event::Key::Char('q')) {
             break;
+        } else if event == events::Event::Tick {
+            let song = client
+                .borrow_mut()
+                .currentsong()
+                .expect("failed to get song");
+            let status = client.borrow_mut().status().expect("failed to get status");
+            let queue = client.borrow_mut().queue().expect("failed to get queue");
+            app.set_song(song);
+            app.set_status(status);
+            app.set_song_queue(queue);
         } else {
             app.handle_event(&event);
         }

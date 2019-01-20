@@ -3,7 +3,7 @@ use std::time::Duration;
 use std::{io, thread};
 use termion::input::TermRead;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Event {
     Input(termion::event::Event),
     // Occurs once every `tick_duration`.

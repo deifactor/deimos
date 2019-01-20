@@ -16,7 +16,10 @@ pub struct AlbumTree {
     albums: HashMap<String, Vec<String>>,
 
     /// The rows are stored as a vec of (album artist, album) pairs. If the
-    /// album is None, the row corresponds to an artist.
+    /// album is None, the row corresponds to an artist. XXX: this is
+    /// memory-hungry. A more lean (but less safe) implementation would just
+    /// store the index of the (artist, album_offset) pair and have rules for
+    /// how to increment/decrement.
     rows: Vec<(String, Option<String>)>,
 
     client: Rc<RefCell<mpd::Client>>,
