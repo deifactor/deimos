@@ -3,6 +3,7 @@ use std::time::Duration;
 use std::{io, thread};
 use termion::input::TermRead;
 
+#[derive(Debug)]
 pub enum Event {
     Input(termion::event::Event),
     // Occurs once every `tick_duration`.
@@ -29,7 +30,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Config {
         Config {
-            tick_duration: Duration::from_millis(100),
+            tick_duration: Duration::from_millis(1000000),
         }
     }
 }
@@ -49,7 +50,7 @@ impl EventReceiver {
                 let stdin = io::stdin();
                 for event in stdin.events() {
                     if let Ok(evt) = event {
-                        tx.send(Event::Input(evt));
+                        tx.send(Event::Input(clean_termion_event(evt)));
                     }
                 }
             });
@@ -68,6 +69,26 @@ impl EventReceiver {
     pub fn next(&self) -> Result<Event, mpsc::RecvError> {
         self.rx.recv()
     }
+}
+
+/// Adds proper handling for arrow keys, which don't seem to work on my setup
+/// (iTerm2); it just passes them through as unrecognized key sequences. XXX:
+/// fix this in termion.
+fn clean_termion_event(event: termion::event::Event) -> termion::event::Event {
+    use termion::event::{Event, Key};
+    if let termion::event::Event::Unsupported(ref bytes) = event {
+        let mut it = bytes.iter();
+        if it.next() == Some(&b'\x1B') && it.next() == Some(&b'O') {
+            match it.next() {
+                Some(b'A') => return Event::Key(Key::Up),
+                Some(b'B') => return Event::Key(Key::Down),
+                Some(b'C') => return Event::Key(Key::Right),
+                Some(b'D') => return Event::Key(Key::Left),
+                _ => (),
+            }
+        }
+    }
+    event
 }
 
 pub trait EventHandler {

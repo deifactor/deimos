@@ -69,7 +69,16 @@ impl AlbumTree {
 }
 
 impl events::EventHandler for AlbumTree {
-    fn handle_event(&mut self, _events: &events::Event) {}
+    fn handle_event(&mut self, event: &events::Event) {
+        use termion::event::Key;
+        if let Some(key) = event.key() {
+            match key {
+                Key::Up => self.up(),
+                Key::Down => self.down(),
+                _ => (),
+            }
+        }
+    }
 }
 
 impl tui::widgets::Widget for AlbumTree {
@@ -81,13 +90,18 @@ impl tui::widgets::Widget for AlbumTree {
             .enumerate()
             .take(area.height as usize)
         {
+            let style = if Some(i) == self.selected {
+                tui::style::Style::default().modifier(tui::style::Modifier::Invert)
+            } else {
+                Default::default()
+            };
             self.background(&area, buf, tui::style::Color::Reset);
             buf.set_stringn(
                 area.left(),
                 area.top() + i as u16,
                 album_artist,
                 area.width as usize,
-                Default::default(),
+                style,
             )
         }
     }

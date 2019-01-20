@@ -2,6 +2,7 @@ mod config;
 mod events;
 mod widgets;
 
+use events::EventHandler;
 use failure;
 use mpd;
 use std::cell::RefCell;
@@ -44,8 +45,6 @@ fn main() -> Result<(), failure::Error> {
     let mut size = terminal.size()?;
     terminal.hide_cursor()?;
 
-    let mut screen = widgets::app::Screen::Queue;
-
     let client = Rc::new(RefCell::new(mpd::Client::connect((opt.host.as_str(), opt.port)).expect("failed to connect to MPD")));
     let mut app = widgets::App::new(client.clone(), &config);
 
@@ -64,20 +63,17 @@ fn main() -> Result<(), failure::Error> {
 
         terminal
             .draw(|mut f| {
-                app.screen = screen;
                 app.set_song(song);
                 app.set_status(status);
                 app.set_song_queue(queue);
                 app.render(&mut f, size)
             })
             .expect("failed to draw");
-        if let Some(termion::event::Key::Char(c)) = receiver.next()?.key() {
-            match c {
-                'q' => break,
-                '1' => screen = widgets::app::Screen::Queue,
-                '2' => screen = widgets::app::Screen::Albums,
-                _ => (),
-            }
+        let event = receiver.next()?;
+        if event.key() == Some(&termion::event::Key::Char('q')) {
+            break;
+        } else {
+            app.handle_event(&event);
         }
     }
     Ok(())
