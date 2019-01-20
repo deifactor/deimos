@@ -6,31 +6,42 @@ use tui;
 use tui::widgets::Widget;
 
 /// A widget displaying the now-playing queue.
-pub struct Queue {
-    queue: Vec<Song>,
+pub struct Queue<'a> {
+    queue: Option<Vec<Song>>,
     position: Option<u32>,
-    formatter: mimi::Formatter,
+    formatter: &'a mimi::Formatter,
 }
 
-impl Queue {
-    pub fn new(queue: Vec<Song>, position: Option<u32>, formatter: mimi::Formatter) -> Queue {
+impl<'a> Queue<'a> {
+    pub fn new(formatter: &'a mimi::Formatter) -> Self {
         Queue {
-            queue,
-            position,
+            queue: None,
+            position: None,
             formatter,
         }
+    }
+
+    pub fn set_queue(&mut self, queue: Vec<Song>) {
+        self.queue = Some(queue)
+    }
+
+    pub fn set_position(&mut self, position: Option<u32>) {
+        self.position = position
     }
 }
 
 // TODO
-impl events::EventHandler for Queue {
+impl events::EventHandler for Queue<'_> {
     fn handle_event(&mut self, events: &events::Event) {}
 }
 
-impl Widget for Queue {
+impl Widget for Queue<'_> {
     fn draw(&mut self, area: tui::layout::Rect, buf: &mut tui::buffer::Buffer) {
+        let empty: Vec<Song> = vec![];
         let texts = self
             .queue
+            .as_ref()
+            .unwrap_or(&empty)
             .iter()
             .enumerate()
             .flat_map(|(index, song)| {

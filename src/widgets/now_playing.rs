@@ -1,31 +1,17 @@
 use crate::widgets;
-use mpd::song::Song;
+use mpd::{Song, Status};
 use time::Duration;
 use tui;
 use tui::widgets::Widget;
 
 /// A widget displaying information about what's currently playing.
-pub struct NowPlaying {
-    song: Option<Song>,
-    status: mpd::status::Status,
-    formatter: mimi::Formatter,
+pub struct NowPlaying<'a> {
+    pub song: &'a Option<Song>,
+    pub status: &'a mpd::status::Status,
+    pub formatter: &'a mimi::Formatter,
 }
 
-impl NowPlaying {
-    pub fn new(
-        song: Option<Song>,
-        status: mpd::status::Status,
-        formatter: mimi::Formatter,
-    ) -> NowPlaying {
-        NowPlaying {
-            song,
-            status,
-            formatter,
-        }
-    }
-}
-
-impl Widget for NowPlaying {
+impl Widget for NowPlaying<'_> {
     fn draw(&mut self, area: tui::layout::Rect, buf: &mut tui::buffer::Buffer) {
         if let Some(ref song) = self.song {
             if let Some(ref elapsed) = self.status.elapsed {

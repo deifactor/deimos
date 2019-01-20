@@ -4,9 +4,11 @@ mod widgets;
 
 use failure;
 use mpd;
+use std::cell::RefCell;
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
+use std::rc::Rc;
 use structopt::StructOpt;
 use termion::raw::IntoRawMode;
 use termion::screen::AlternateScreen;
@@ -37,9 +39,6 @@ fn main() -> Result<(), failure::Error> {
         buf.parse()?
     };
 
-    let mut conn =
-        mpd::Client::connect((opt.host.as_str(), opt.port)).expect("failed to connect to MPD");
-
     let stdout = io::stdout().into_raw_mode()?;
     let stdout = termion::input::MouseTerminal::from(stdout);
     let stdout = AlternateScreen::from(stdout);
@@ -50,6 +49,9 @@ fn main() -> Result<(), failure::Error> {
 
     let mut screen = widgets::app::Screen::Queue;
 
+    let client = Rc::new(RefCell::new(mpd::Client::connect((opt.host.as_str(), opt.port)).expect("failed to connect to MPD")));
+    let mut app = widgets::App::new(size, client.clone(), &config);
+
     let receiver = events::EventReceiver::new(events::Config::default());
     loop {
         {
@@ -59,25 +61,16 @@ fn main() -> Result<(), failure::Error> {
                 size = new_size;
             }
         }
-        let song = conn.currentsong().expect("failed to get song");
-        let status = conn.status().expect("failed to get status");
-        let queue = conn.queue().expect("failed to get queue");
-        let pos = song.as_ref().and_then(|song| Some(song.place?.pos));
-        let queue = widgets::Queue::new(queue, pos, config.format.playlist_song.clone());
+        let song = client.borrow_mut().currentsong().expect("failed to get song");
+        let status = client.borrow_mut().status().expect("failed to get status");
+        let queue = client.borrow_mut().queue().expect("failed to get queue");
 
-        let album_artists = conn
-            .list(&mpd::Term::Tag("AlbumArtist".into()), &mpd::Query::new())
-            .expect("failed to list album artists");
-        let album_tree = widgets::AlbumTree::new(album_artists);
-        let now_playing = widgets::NowPlaying::new(
-            song,
-            status,
-            config.format.now_playing.clone(),
-        );
         terminal
             .draw(|mut f| {
-                let mut app = widgets::App::new(size, queue, album_tree, now_playing);
                 app.screen = screen;
+                app.set_song(song);
+                app.set_status(status);
+                app.set_song_queue(queue);
                 app.render(&mut f, size)
             })
             .expect("failed to draw");

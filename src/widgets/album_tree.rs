@@ -1,5 +1,7 @@
 use crate::events;
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 /// Lists all of the albums in the user's library in tree form.
 pub struct AlbumTree {
@@ -11,12 +13,15 @@ pub struct AlbumTree {
 
     /// The album artists that we've expanded, and their individual albums.
     albums: HashMap<String, Vec<String>>,
+
+    client: Rc<RefCell<mpd::Client>>,
 }
 
 impl AlbumTree {
-    pub fn new(album_artists: Vec<String>) -> Self {
+    pub fn new(album_artists: Vec<String>, client: Rc<RefCell<mpd::Client>>) -> Self {
         Self {
             album_artists,
+            client,
             selected: None,
             albums: HashMap::new(),
         }
@@ -45,16 +50,14 @@ impl AlbumTree {
     }
 
     /// Toggles whether the currently-selected album artist is expanded or not.
-    /// This needs a client so it can fetch the albums if necessary. Returns
-    /// failure only if loading the albums fails. TODO: doing it this way is
-    /// kind of annoying.
-    pub fn toggle(&mut self, client: &mut mpd::Client) -> Result<(), mpd::error::Error> {
+    /// Returns a failure if communicating with the client failed.
+    pub fn toggle(&mut self) -> Result<(), mpd::error::Error> {
         if let Some(selected) = self.selected {
             let album_artist = &self.album_artists[selected];
             if self.albums.contains_key(album_artist) {
                 self.albums.remove(album_artist);
             } else {
-                let albums = client.list(
+                let albums = self.client.borrow_mut().list(
                     &mpd::Term::Tag("Album".into()),
                     mpd::Query::new().and(mpd::Term::Tag("AlbumArtist".into()), album_artist),
                 )?;
