@@ -8,23 +8,31 @@ pub struct AlbumTree {
     /// All of the album artists in the library.
     album_artists: Vec<String>,
 
-    /// The index of the currently-selected album artist.
+    /// The index of the currently-selected row. This may correspond to an album
+    /// artist, or just an album.
     selected: Option<usize>,
 
     /// The album artists that we've expanded, and their individual albums.
     albums: HashMap<String, Vec<String>>,
+
+    /// The rows are stored as a vec of (album artist, album) pairs. If the
+    /// album is None, the row corresponds to an artist.
+    rows: Vec<(String, Option<String>)>,
 
     client: Rc<RefCell<mpd::Client>>,
 }
 
 impl AlbumTree {
     pub fn new(album_artists: Vec<String>, client: Rc<RefCell<mpd::Client>>) -> Self {
-        Self {
+        let mut album_tree = Self {
             album_artists,
             client,
             selected: None,
+            rows: vec![],
             albums: HashMap::new(),
-        }
+        };
+        album_tree.compute_rows();
+        album_tree
     }
 
     /// Moves the selection up.
@@ -33,7 +41,7 @@ impl AlbumTree {
             return;
         }
         self.selected = match self.selected {
-            None => Some(self.album_artists.len() - 1),
+            None => Some(self.rows.len() - 1),
             Some(n) => Some(std::cmp::max(n - 1, 0)),
         }
     }
@@ -45,7 +53,7 @@ impl AlbumTree {
         }
         self.selected = match self.selected {
             None => Some(0),
-            Some(n) => Some(std::cmp::min(n + 1, self.album_artists.len())),
+            Some(n) => Some(std::cmp::min(n + 1, self.rows.len())),
         }
     }
 
@@ -53,18 +61,43 @@ impl AlbumTree {
     /// Returns a failure if communicating with the client failed.
     pub fn toggle(&mut self) -> Result<(), mpd::error::Error> {
         if let Some(selected) = self.selected {
-            let album_artist = &self.album_artists[selected];
-            if self.albums.contains_key(album_artist) {
-                self.albums.remove(album_artist);
-            } else {
+            // We allow toggling an album, treating it as if we'd toggled on the
+            // parent album artist.
+            let (album_artist, album) = &self.rows[selected].clone();
+            let expand = !self.albums.contains_key(album_artist);
+            if expand {
                 let albums = self.client.borrow_mut().list(
                     &mpd::Term::Tag("Album".into()),
                     mpd::Query::new().and(mpd::Term::Tag("AlbumArtist".into()), album_artist),
                 )?;
                 self.albums.insert(album_artist.clone(), albums);
+            } else {
+                self.albums.remove(album_artist);
+            }
+            self.compute_rows();
+            if album.is_some() && !expand {
+                // We were on an album, but we removed it, so adjust our index
+                // to the parent artist.
+                self.selected = self.rows.iter().position(|ref row| &row.0 == album_artist)
             }
         }
         Ok(())
+    }
+
+    /// Populates the list of rows from `album_artists` and `albums`.
+    fn compute_rows(&mut self) {
+        self.rows = vec![];
+        for album_artist in &self.album_artists {
+            self.rows.push((album_artist.clone(), None));
+            match self.albums.get(album_artist) {
+                Some(albums) => self.rows.extend(
+                    albums
+                        .iter()
+                        .map(|album| (album_artist.clone(), Some(album.clone()))),
+                ),
+                None => (),
+            }
+        }
     }
 }
 
@@ -75,6 +108,7 @@ impl events::EventHandler for AlbumTree {
             match key {
                 Key::Up => self.up(),
                 Key::Down => self.down(),
+                Key::Char('\n') => self.toggle().expect("failed to talk to client"),
                 _ => (),
             }
         }
@@ -83,8 +117,8 @@ impl events::EventHandler for AlbumTree {
 
 impl tui::widgets::Widget for AlbumTree {
     fn draw(&mut self, area: tui::layout::Rect, buf: &mut tui::buffer::Buffer) {
-        for (i, album_artist) in self
-            .album_artists
+        for (i, (album_artist, album)) in self
+            .rows
             .iter()
             .by_ref()
             .enumerate()
@@ -95,11 +129,15 @@ impl tui::widgets::Widget for AlbumTree {
             } else {
                 Default::default()
             };
+            let text = match album {
+                Some(album) => format!(" └──{}", album),
+                None => album_artist.clone(),
+            };
             self.background(&area, buf, tui::style::Color::Reset);
             buf.set_stringn(
                 area.left(),
                 area.top() + i as u16,
-                album_artist,
+                text,
                 area.width as usize,
                 style,
             )
