@@ -48,6 +48,8 @@ fn main() -> Result<(), failure::Error> {
     let mut size = terminal.size()?;
     terminal.hide_cursor()?;
 
+    let mut screen = widgets::app::Screen::Queue;
+
     let receiver = events::EventReceiver::new(events::Config::default());
     loop {
         {
@@ -62,6 +64,11 @@ fn main() -> Result<(), failure::Error> {
         let queue = conn.queue().expect("failed to get queue");
         let pos = song.as_ref().and_then(|song| Some(song.place?.pos));
         let queue = widgets::Queue::new(queue, pos, config.format.playlist_song.clone());
+
+        let album_artists = conn
+            .list(&mpd::Term::Tag("AlbumArtist".into()), &mpd::Query::new())
+            .expect("failed to list album artists");
+        let album_tree = widgets::AlbumTree::new(album_artists);
         let now_playing = widgets::NowPlaying::new(
             song,
             status.elapsed,
@@ -69,12 +76,21 @@ fn main() -> Result<(), failure::Error> {
             config.format.now_playing.clone(),
         );
         terminal
-            .draw(|mut f| widgets::App::new(size, queue, now_playing).render(&mut f, size))
+            .draw(|mut f| {
+                let mut app = widgets::App::new(size, queue, album_tree, now_playing);
+                app.screen = screen;
+                app.render(&mut f, size)
+            })
             .expect("failed to draw");
-        if let events::Event::Input(termion::event::Event::Key(termion::event::Key::Char('q'))) =
+        if let events::Event::Input(termion::event::Event::Key(termion::event::Key::Char(c))) =
             receiver.next()?
         {
-            break;
+            match c {
+                'q' => break,
+                '1' => screen = widgets::app::Screen::Queue,
+                '2' => screen = widgets::app::Screen::Albums,
+                _ => (),
+            }
         }
     }
     Ok(())

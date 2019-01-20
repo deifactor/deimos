@@ -1,5 +1,5 @@
 mod album_tree;
-mod app;
+pub mod app;
 mod now_playing;
 mod queue;
 
