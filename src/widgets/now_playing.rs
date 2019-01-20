@@ -7,22 +7,19 @@ use tui::widgets::Widget;
 /// A widget displaying information about what's currently playing.
 pub struct NowPlaying {
     song: Option<Song>,
-    elapsed: Option<Duration>,
-    state: mpd::status::State,
+    status: mpd::status::Status,
     formatter: mimi::Formatter,
 }
 
 impl NowPlaying {
     pub fn new(
         song: Option<Song>,
-        elapsed: Option<Duration>,
-        state: mpd::status::State,
+        status: mpd::status::Status,
         formatter: mimi::Formatter,
     ) -> NowPlaying {
         NowPlaying {
             song,
-            elapsed,
-            state,
+            status,
             formatter,
         }
     }
@@ -31,7 +28,7 @@ impl NowPlaying {
 impl Widget for NowPlaying {
     fn draw(&mut self, area: tui::layout::Rect, buf: &mut tui::buffer::Buffer) {
         if let Some(ref song) = self.song {
-            if let Some(ref elapsed) = self.elapsed {
+            if let Some(ref elapsed) = self.status.elapsed {
                 let seconds = elapsed.num_seconds() - elapsed.num_minutes() * 60;
                 let text = format!("{}:{:02}", elapsed.num_minutes(), seconds);
                 let len = text.len();

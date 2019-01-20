@@ -71,8 +71,7 @@ fn main() -> Result<(), failure::Error> {
         let album_tree = widgets::AlbumTree::new(album_artists);
         let now_playing = widgets::NowPlaying::new(
             song,
-            status.elapsed,
-            status.state,
+            status,
             config.format.now_playing.clone(),
         );
         terminal
