@@ -45,7 +45,7 @@ impl AlbumTree {
         }
         self.selected = match self.selected {
             None => Some(self.rows.len() - 1),
-            Some(n) => Some((n - 1).max(0))
+            Some(n) => Some((n - 1).max(0)),
         }
     }
 
@@ -56,7 +56,7 @@ impl AlbumTree {
         }
         self.selected = match self.selected {
             None => Some(0),
-            Some(n) => Some((self.rows.len() - 1).min(n + 1))
+            Some(n) => Some((self.rows.len() - 1).min(n + 1)),
         }
     }
 
@@ -92,13 +92,12 @@ impl AlbumTree {
         self.rows = vec![];
         for album_artist in &self.album_artists {
             self.rows.push((album_artist.clone(), None));
-            match self.albums.get(album_artist) {
-                Some(albums) => self.rows.extend(
+            if let Some(albums) = self.albums.get(album_artist) {
+                self.rows.extend(
                     albums
                         .iter()
                         .map(|album| (album_artist.clone(), Some(album.clone()))),
-                ),
-                None => (),
+                );
             }
         }
     }
