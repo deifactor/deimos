@@ -1,20 +1,19 @@
 mod config;
-mod events;
-mod widgets;
 
-use events::EventHandler;
-use failure;
-use mpd;
-use std::cell::RefCell;
-use std::fs::File;
-use std::io;
-use std::io::prelude::*;
-use std::rc::Rc;
+use std::io::{self, Read};
+use std::thread;
+use std::time::Duration;
+
+use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture};
+use crossterm::execute;
+use crossterm::terminal::{
+    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+};
 use structopt::StructOpt;
-use termion::raw::IntoRawMode;
-use termion::screen::AlternateScreen;
-use tui;
-use tui::widgets::Widget;
+
+use tui::backend::CrosstermBackend;
+use tui::widgets::{Block, Borders};
+use tui::{self, Terminal};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "catgirl")]
@@ -29,56 +28,35 @@ struct Opt {
 }
 
 fn main() -> Result<(), failure::Error> {
-    let opt = Opt::from_args();
-    let config: config::Config = {
-        let path = config::config_path().expect("Couldn't determine path to the config file");
-        let mut buf = String::new();
-        File::open(path)?.read_to_string(&mut buf)?;
-        buf.parse()?
-    };
+    // setup terminal
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
 
-    let stdout = io::stdout().into_raw_mode()?;
-    let stdout = termion::input::MouseTerminal::from(stdout);
-    let stdout = AlternateScreen::from(stdout);
-    let backend = tui::backend::TermionBackend::new(stdout);
-    let mut terminal = tui::Terminal::new(backend)?;
-    let mut size = terminal.size()?;
-    terminal.hide_cursor()?;
+    terminal.draw(|f| {
+        let size = f.size();
+        let block = Block::default().title("nya").borders(Borders::ALL);
+        f.render_widget(block, size);
+    })?;
 
-    let client = Rc::new(RefCell::new(
-        mpd::Client::connect((opt.host.as_str(), opt.port)).expect("failed to connect to MPD"),
-    ));
-    let mut app = widgets::App::new(client.clone(), &config);
+    // Start a thread to discard any input events. Without handling events, the
+    // stdin buffer will fill up, and be read into the shell when the program exits.
+    thread::spawn(|| loop {
+        let _ = event::read();
+    });
 
-    let receiver = events::EventReceiver::new(events::Config::default());
-    loop {
-        {
-            let new_size = terminal.size()?;
-            if size != new_size {
-                terminal.resize(new_size)?;
-                size = new_size;
-            }
-        }
+    thread::sleep(Duration::from_millis(5000));
 
-        terminal
-            .draw(|mut f| app.render(&mut f, size))
-            .expect("failed to draw");
-        let event = receiver.next()?;
-        if event.key() == Some(&termion::event::Key::Char('q')) {
-            break;
-        } else if event == events::Event::Tick {
-            let song = client
-                .borrow_mut()
-                .currentsong()
-                .expect("failed to get song");
-            let status = client.borrow_mut().status().expect("failed to get status");
-            let queue = client.borrow_mut().queue().expect("failed to get queue");
-            app.set_song(song);
-            app.set_status(status);
-            app.set_song_queue(queue);
-        } else {
-            app.handle_event(&event);
-        }
-    }
+    // restore terminal
+    disable_raw_mode()?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
+    terminal.show_cursor()?;
+
     Ok(())
 }

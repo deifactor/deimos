@@ -243,7 +243,8 @@ mod tests {
             vec![Node::Formatted {
                 style,
                 children: vec![Node::Literal("foo".into())]
-            }])
+            }]
+        )
     }
 
     #[test]
@@ -293,5 +294,4 @@ mod tests {
             }]
         );
     }
-
 }

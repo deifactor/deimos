@@ -19,9 +19,10 @@ structopt = "0.2"
 termion = "1.5"
 time = "0.1"
 toml = "0.4"
-tui = "0.3"
+tui = { package = "ratatui", version = "0.21.0" }
 dirs = "1.0"
 rodio = { version = "0.17.1", features = ["symphonia-all"], default-features = false }
+crossterm = "0.26.1"
 
 [workspace]
 members = [
