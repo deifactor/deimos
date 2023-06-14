@@ -8,7 +8,7 @@ use termion;
 pub enum Modifier {
     Bold,
     Underline,
-    Reverse
+    Reverse,
 }
 
 impl Modifier {
@@ -141,9 +141,9 @@ impl Style {
 impl From<Modifier> for tui::style::Modifier {
     fn from(modifier: Modifier) -> tui::style::Modifier {
         match modifier {
-            Modifier::Bold => tui::style::Modifier::Bold,
-            Modifier::Underline => tui::style::Modifier::Underline,
-            Modifier::Reverse => tui::style::Modifier::Invert,
+            Modifier::Bold => tui::style::Modifier::BOLD,
+            Modifier::Underline => tui::style::Modifier::UNDERLINED,
+            Modifier::Reverse => tui::style::Modifier::REVERSED,
         }
     }
 }
@@ -178,19 +178,14 @@ impl From<Color> for tui::style::Color {
 #[cfg(feature = "to_tui")]
 impl From<Style> for tui::style::Style {
     fn from(style: Style) -> tui::style::Style {
-        assert!(
-            style.modifiers.len() <= 1,
-            "tui can't stack modifiers, got {:?}",
-            style.modifiers
-        );
         tui::style::Style {
-            fg: style.foreground.unwrap_or(Color::Reset).into(),
-            bg: style.background.unwrap_or(Color::Reset).into(),
-            modifier: style
+            fg: Some(style.foreground.unwrap_or(Color::Reset).into()),
+            bg: Some(style.background.unwrap_or(Color::Reset).into()),
+            add_modifier: style
                 .modifiers
                 .into_iter()
-                .next()
-                .map_or(tui::style::Modifier::Reset, |m| m.into()),
+                .fold(tui::style::Modifier::empty(), |a, b| a | b.into()),
+            sub_modifier: tui::style::Modifier::empty(),
         }
     }
 }
