@@ -21,6 +21,7 @@ time = "0.1"
 toml = "0.4"
 tui = "0.3"
 dirs = "1.0"
+rodio = { version = "0.17.1", features = ["symphonia-all"], default-features = false }
 
 [workspace]
 members = [

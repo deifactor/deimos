@@ -20,6 +20,9 @@
           nativeBuildInputs = with pkgs; [
             toolchain
             cargo-nextest
+
+            pkg-config
+            alsa-lib
           ];
         };
       }
