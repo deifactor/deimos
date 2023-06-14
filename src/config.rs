@@ -65,7 +65,7 @@ pub fn config_path() -> Option<path::PathBuf> {
 
 /// A low-level description of the configuration file. `raw::Config` is transformed into `Config`.
 mod raw {
-    use serde_derive::Deserialize;
+    use serde::Deserialize;
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "kebab-case")]

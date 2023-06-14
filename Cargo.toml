@@ -7,22 +7,17 @@ homepage = "http://github.com/deifactor/catgirl"
 repository = "http://github.com/deifactor/catgirl"
 
 [dependencies]
-base64 = "0.10"
 failure = "0.1"
-id3 = "0.2"
 maplit = "1.0"
 mimi = { path = "./mimi", features = ["to_tui"] }
-mpd = "0.0.12"
-serde = "1.0"
-serde_derive = "1.0"
 structopt = "0.2"
 termion = "1.5"
-time = "0.1"
 toml = "0.4"
 tui = { package = "ratatui", version = "0.21.0" }
 dirs = "1.0"
 rodio = { version = "0.17.1", features = ["symphonia-all"], default-features = false }
 crossterm = "0.26.1"
+serde = { version = "1.0.164", features = ["derive"] }
 
 [workspace]
 members = [
