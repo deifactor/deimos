@@ -2,7 +2,7 @@
 name = "mimi"
 version = "0.1.2"
 authors = ["Ash <ext0l@catgirl.ai>"]
-edition = "2018"
+edition = "2021"
 description = "A library for terminal-oriented runtime string formatting and interpolation."
 keywords = ["formatting", "terminal", "tui"]
 categories = ["command-line-interface", "value-formatting"]

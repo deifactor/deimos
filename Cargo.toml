@@ -2,7 +2,7 @@
 name = "catgirl"
 version = "0.1.0"
 authors = ["Ash <ext0l@catgirl.ai>"]
-edition = "2018"
+edition = "2021"
 homepage = "http://github.com/deifactor/catgirl"
 repository = "http://github.com/deifactor/catgirl"
 
