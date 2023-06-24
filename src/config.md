@@ -1,10 +1,10 @@
-# catgirl configuration
+# deimos configuration
 
 The path to the configuration file depends on your operating system.
 
-- **macOS** uses `$HOME/Library/Preferences/zone.synthetic.catgirl/config.toml`
-- **Windows** uses `%appdata%/catgirl/config.toml`
-- **Linux** uses `$HOME/.config/catgirl/config.toml`
+- **macOS** uses `$HOME/Library/Preferences/zone.synthetic.deimos/config.toml`
+- **Windows** uses `%appdata%/deimos/config.toml`
+- **Linux** uses `$HOME/.config/deimos/config.toml`
 
 Other OSes aren't supported at the moment. Sorry :(
 

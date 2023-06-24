@@ -7,12 +7,9 @@ description = "A library for terminal-oriented runtime string formatting and int
 keywords = ["formatting", "terminal", "tui"]
 categories = ["command-line-interface", "value-formatting"]
 license = "MIT"
-homepage = "https://github.com/deifactor/catgirl/tree/main/mimi"
-repository = "http://github.com/deifactor/catgirl"
+homepage = "https://github.com/deifactor/deimos/tree/main/mimi"
+repository = "http://github.com/deifactor/deimos"
 readme = "README.md"
-
-[badges]
-travis-ci = { repository = "deifactor/catgirl", branch = "main" }
 
 [dependencies]
 maplit = "^1.0"

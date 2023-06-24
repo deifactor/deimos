@@ -1,4 +1,4 @@
-//! Code for storing and parsing catgirl configuration data. See config.md for
+//! Code for storing and parsing deimos configuration data. See config.md for
 //! end-user documentation.
 
 use std::path;
@@ -44,19 +44,19 @@ impl Format {
     }
 }
 
-/// The directory `catgirl` stores its configuration in. Returns `None` if we
+/// The directory `deimos` stores its configuration in. Returns `None` if we
 /// couldn't figure something out, which happens if you're not running macOS,
 /// Windows, or Linux.
 pub fn config_dir() -> Option<path::PathBuf> {
     let subdir = if cfg!(target_os = "macos") {
-        "zone.synthetic.catgirl"
+        "zone.synthetic.deimos"
     } else {
-        "catgirl"
+        "deimos"
     };
     dirs::config_dir().map(|path| [path, subdir.into()].iter().collect())
 }
 
-/// The file `catgirl` will load its configuration from. Returns `None` if we
+/// The file `deimos` will load its configuration from. Returns `None` if we
 /// couldn't figure something out, which happens if you're not running macOS,
 /// Windows, or Linux.
 pub fn config_path() -> Option<path::PathBuf> {

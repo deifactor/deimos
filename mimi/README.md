@@ -1,8 +1,7 @@
-[![Build Status](https://travis-ci.org/deifactor/catgirl.svg?branch=mistress)](https://travis-ci.org/deifactor/catgirl)
 [![Crate version](https://img.shields.io/crates/v/mimi.svg)](https://crates.io/crates/mimi)
 
 `mimi` is a library for allowing the user to control how part of a terminal
-program is formatted. The main usecase is for the `catgirl` command-line `mpd`
+program is formatted. The main usecase is for the `deimos` command-line `mpd`
 client, but of course other uses are welcome.
 
 ![A demo of mimi formatting](/mimi/example.png?raw=true)
@@ -46,4 +45,5 @@ The demo binary in `src/examples/demo.rs` allows you to play around with mimi fo
 ## What's in a name?
 
 'Nekomimi' is the Japanese word for 'person with cat ears', with 'neko' meaning
-'cat' and 'mimi' meaning 'ears'.
+'cat' and 'mimi' meaning 'ears'. The music player this was originally written
+for was named 'catgirl'.

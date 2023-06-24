@@ -1,10 +1,10 @@
 [package]
-name = "catgirl"
+name = "deimos"
 version = "0.1.0"
 authors = ["Ash <ext0l@catgirl.ai>"]
 edition = "2021"
-homepage = "http://github.com/deifactor/catgirl"
-repository = "http://github.com/deifactor/catgirl"
+homepage = "http://github.com/deifactor/deimos"
+repository = "http://github.com/deifactor/deimos"
 
 [dependencies]
 failure = "0.1"
@@ -18,6 +18,7 @@ dirs = "1.0"
 rodio = { version = "0.17.1", features = ["symphonia-all"], default-features = false }
 crossterm = "0.26.1"
 serde = { version = "1.0.164", features = ["derive"] }
+clap = { version = "4.3.3", features = ["derive"] }
 
 [workspace]
 members = [

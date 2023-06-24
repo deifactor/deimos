@@ -16,7 +16,7 @@ use tui::widgets::{Block, Borders};
 use tui::{self, Terminal};
 
 #[derive(StructOpt, Debug)]
-#[structopt(name = "catgirl")]
+#[structopt(name = "deimos")]
 struct Opt {
     /// The host to connect to.
     #[structopt(short = "h", long = "host", default_value = "localhost")]
