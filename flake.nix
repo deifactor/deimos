@@ -23,6 +23,7 @@
 
             pkg-config
             alsa-lib
+            ncurses
           ];
         };
       }
