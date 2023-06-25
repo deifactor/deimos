@@ -80,6 +80,7 @@ fn build_style(style: pest::iterators::Pair<Rule>) -> Style {
 ///
 /// On success, the root is guaranteed to be a `Node::Formatted` variant with
 /// `Style::default()` as its style.
+#[allow(clippy::result_large_err)]
 pub fn parse(input: &str) -> Result<Node, pest::error::Error<Rule>> {
     let tokens = MimiParser::parse(Rule::format_string_entire, input)?;
     Ok(Node::Formatted {
@@ -127,7 +128,7 @@ mod tests {
     fn children(input: &str) -> Vec<Node> {
         let result = parse(input);
         if let Ok(Node::Formatted { children, .. }) = result {
-            return children;
+            children
         } else {
             panic!("bad parse result {:?}", result);
         }

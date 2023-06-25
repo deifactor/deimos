@@ -103,8 +103,8 @@ impl Formatter {
         base: Style,
     ) -> Box<dyn Iterator<Item = (String, Style)>> {
         match root {
-            Node::Literal(s) => Box::new(iter::once((s.clone(), base.clone()))),
-            Node::Variable(key) => Box::new(iter::once((values[key].clone(), base.clone()))),
+            Node::Literal(s) => Box::new(iter::once((s.clone(), base))),
+            Node::Variable(key) => Box::new(iter::once((values[key].clone(), base))),
             Node::Formatted { style, children } => Box::new(
                 children
                     .iter()
