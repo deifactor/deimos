@@ -7,4 +7,7 @@ homepage = "http://github.com/deifactor/deimos"
 repository = "http://github.com/deifactor/deimos"
 
 [dependencies]
+anyhow = { version = "1.0.71", features = ["backtrace"] }
 cursive = "0.20.0"
+symphonia = { version = "0.5.3", features = ["all"] }
+walkdir = "2.3.3"
