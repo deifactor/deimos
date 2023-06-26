@@ -24,6 +24,9 @@
             pkg-config
             alsa-lib
             ncurses
+            openssl
+
+            sqlite-interactive
           ];
         };
       }

@@ -8,6 +8,7 @@ use cursive::{
     theme::Palette,
     views::{Button, LinearLayout},
 };
+use library::initialize_db;
 use player::Player;
 use rodio::{Decoder, OutputStream};
 
@@ -18,8 +19,12 @@ fn palette() -> Palette {
     palette
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let song_path = library::find_music("/home/vector/music")?;
+
+    let _conn = initialize_db("songs.db").await?;
+
     let mut siv = cursive::default();
     siv.with_theme(|theme| theme.palette = palette());
 

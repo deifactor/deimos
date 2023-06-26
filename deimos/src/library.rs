@@ -1,4 +1,9 @@
 use anyhow::{bail, Result};
+use sqlx::{
+    pool::PoolConnection,
+    sqlite::{SqliteConnectOptions},
+    Executor, Sqlite, SqlitePool,
+};
 use std::{
     fs::File,
     path::{Path, PathBuf},
@@ -7,8 +12,24 @@ use symphonia::core::{
     io::MediaSourceStream,
     meta::{MetadataRevision, StandardTagKey, Value},
 };
+use tokio::fs::remove_file;
 
 use walkdir::WalkDir;
+
+/// Initialize the song database, creating all tables. This deletes any existing database.
+pub async fn initialize_db(path: impl AsRef<Path>) -> Result<PoolConnection<Sqlite>> {
+    remove_file(&path).await?;
+
+    let pool = SqlitePool::connect_with(
+        SqliteConnectOptions::new()
+            .filename(path)
+            .create_if_missing(true),
+    )
+    .await?;
+    let mut conn = pool.acquire().await?;
+    conn.execute(include_str!("./create_db.sql")).await?;
+    Ok(conn)
+}
 
 pub fn find_music(path: impl AsRef<Path>) -> Result<PathBuf> {
     let probe = symphonia::default::get_probe();
