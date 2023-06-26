@@ -1,5 +1,8 @@
-use anyhow::Result;
-use std::{fs::File, path::Path};
+use anyhow::{bail, Result};
+use std::{
+    fs::File,
+    path::{Path, PathBuf},
+};
 use symphonia::core::{
     io::MediaSourceStream,
     meta::{MetadataRevision, StandardTagKey, Value},
@@ -7,7 +10,7 @@ use symphonia::core::{
 
 use walkdir::WalkDir;
 
-pub fn find_music(path: impl AsRef<Path>) -> Result<()> {
+pub fn find_music(path: impl AsRef<Path>) -> Result<PathBuf> {
     let probe = symphonia::default::get_probe();
     for entry in WalkDir::new(path)
         .into_iter()
@@ -23,16 +26,11 @@ pub fn find_music(path: impl AsRef<Path>) -> Result<()> {
             &Default::default(),
             &Default::default(),
         )?;
-        println!(
-            "{:?}: {:?}",
-            entry.path(),
-            probed
-                .metadata
-                .get()
-                .and_then(|metadata| metadata.current().and_then(get_title).cloned())
-        );
+        if probed.metadata.get().is_some() {
+            return Ok(PathBuf::from(entry.path()));
+        }
     }
-    Ok(())
+    bail!("couldn't find any music")
 }
 
 fn get_title(rev: &MetadataRevision) -> Option<&Value> {

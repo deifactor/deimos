@@ -8,6 +8,8 @@ repository = "http://github.com/deifactor/deimos"
 
 [dependencies]
 anyhow = { version = "1.0.71", features = ["backtrace"] }
+crossbeam = "0.8.2"
 cursive = "0.20.0"
+rodio = { version = "0.17.1", default-features = false, features = ["symphonia-all"] }
 symphonia = { version = "0.5.3", features = ["all"] }
 walkdir = "2.3.3"
