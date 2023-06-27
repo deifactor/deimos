@@ -27,6 +27,7 @@
             openssl
 
             sqlite-interactive
+            sqlx-cli
           ];
         };
       }

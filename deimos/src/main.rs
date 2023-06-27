@@ -1,8 +1,6 @@
 mod library;
 mod player;
 
-use std::{fs::File, io::BufReader};
-
 use anyhow::Result;
 use cursive::{
     theme::Palette,
@@ -10,7 +8,8 @@ use cursive::{
 };
 use library::initialize_db;
 use player::Player;
-use rodio::{Decoder, OutputStream};
+use rodio::OutputStream;
+use sqlx::Connection;
 
 fn palette() -> Palette {
     use cursive::theme::{Color::*, PaletteColor::*};
@@ -21,17 +20,24 @@ fn palette() -> Palette {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let song_path = library::find_music("/home/vector/music")?;
-
-    let _conn = initialize_db("songs.db").await?;
+    let mut conn = initialize_db("songs.sqlite").await?;
+    let count = sqlx::query!("SELECT COUNT(*) AS count FROM songs")
+        .fetch_one(&mut conn)
+        .await?
+        .count;
+    // only reinitialize db if there are no songs
+    if count == 0 {
+        conn.transaction(|conn| {
+            Box::pin(async move { library::find_music("/home/vector/music", conn).await })
+        })
+        .await?;
+    }
 
     let mut siv = cursive::default();
     siv.with_theme(|theme| theme.palette = palette());
 
     let (_stream, stream_handle) = OutputStream::try_default()?;
     let player = Player::new(stream_handle)?;
-    let source = Decoder::new(BufReader::new(File::open(song_path)?))?;
-    player.append(source);
 
     siv.add_layer(
         LinearLayout::horizontal()

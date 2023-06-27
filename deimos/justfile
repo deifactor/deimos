@@ -1,0 +1,4 @@
+remake-db:
+    sqlx database drop -y
+    sqlx database create
+    sqlx migrate run

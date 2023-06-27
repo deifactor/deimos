@@ -1,7 +1,0 @@
-CREATE TABLE song (
-  song_id INTEGER PRIMARY KEY
-);
-
-CREATE TABLE album (
-  album_id INTEGER PRIMARY KEY
-);
