@@ -7,7 +7,7 @@ use std::{io, panic};
 use anyhow::Result;
 use app::App;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -35,11 +35,19 @@ async fn main() -> Result<()> {
 
     let mut app = App::new();
 
-    terminal.draw(|f| {
-        app.draw(f);
-    })?;
-
-    event::read()?;
+    loop {
+        terminal.draw(|f| {
+            app.draw(f);
+        })?;
+        let event = event::read()?;
+        match event {
+            Event::Key(KeyEvent {
+                code: KeyCode::Char('q') | KeyCode::Esc,
+                ..
+            }) => break,
+            _ => app.handle_event(event),
+        }
+    }
 
     restore_terminal()?;
 

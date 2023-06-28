@@ -1,3 +1,4 @@
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     backend::Backend,
     border,
@@ -15,6 +16,35 @@ pub struct App {
     albums: BrowseList,
     /// Tracks in the current album.
     tracks: BrowseList,
+    focus: Focus,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[allow(clippy::enum_variant_names)]
+pub enum Focus {
+    ArtistList,
+    AlbumList,
+    TrackList,
+}
+
+impl Focus {
+    fn next(self) -> Self {
+        use Focus::*;
+        match self {
+            ArtistList => AlbumList,
+            AlbumList => TrackList,
+            TrackList => ArtistList,
+        }
+    }
+
+    fn prev(self) -> Self {
+        use Focus::*;
+        match self {
+            ArtistList => TrackList,
+            AlbumList => ArtistList,
+            TrackList => AlbumList,
+        }
+    }
 }
 
 impl App {
@@ -26,6 +56,16 @@ impl App {
             artists: BrowseList::new(artists),
             albums: BrowseList::new(albums),
             tracks: BrowseList::new(tracks),
+            focus: Focus::ArtistList,
+        }
+    }
+
+    pub fn handle_event(&mut self, event: Event) {
+        let Event::Key(KeyEvent { code, kind: KeyEventKind::Press, .. }) = event else { return };
+        match code {
+            KeyCode::Tab => self.focus = self.focus.next(),
+            KeyCode::BackTab => self.focus = self.focus.prev(),
+            _ => (),
         }
     }
 
@@ -38,7 +78,8 @@ impl App {
             self.artists.widget().block(
                 Block::default()
                     .title("Artists")
-                    .borders(border!(TOP, BOTTOM, LEFT)),
+                    .borders(border!(TOP, BOTTOM, LEFT))
+                    .border_style(self.border_style(self.focus == Focus::ArtistList)),
             ),
             chunks[0],
             &mut self.artists.state,
@@ -46,19 +87,31 @@ impl App {
         f.render_stateful_widget(
             self.albums.widget().block(
                 Block::default()
+                    .title("Albums")
                     .borders(border!(TOP, BOTTOM, LEFT))
-                    .title("Albums"),
+                    .border_style(self.border_style(self.focus == Focus::AlbumList)),
             ),
             chunks[1],
             &mut self.albums.state,
         );
         f.render_stateful_widget(
-            self.tracks
-                .widget()
-                .block(Block::default().borders(Borders::ALL).title("Tracks")),
+            self.tracks.widget().block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Tracks")
+                    .border_style(self.border_style(self.focus == Focus::TrackList)),
+            ),
             chunks[2],
             &mut self.tracks.state,
         );
+    }
+
+    fn border_style(&self, is_focused: bool) -> Style {
+        if is_focused {
+            Style::default().fg(Color::LightRed)
+        } else {
+            Style::default()
+        }
     }
 }
 
