@@ -10,7 +10,7 @@ repository = "http://github.com/deifactor/deimos"
 anyhow = { version = "1.0.71", features = ["backtrace"] }
 crossbeam = "0.8.2"
 crossterm = "0.26.1"
-ratatui = "0.21.0"
+ratatui = { version = "0.21.0", features = ["macros"] }
 rodio = { version = "0.17.1", default-features = false, features = ["symphonia-all"] }
 sqlx = { version = "0.6", features = ["sqlite", "runtime-tokio-native-tls"] }
 symphonia = { version = "0.5.3", features = ["all"] }

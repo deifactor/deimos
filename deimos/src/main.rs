@@ -1,21 +1,20 @@
+mod app;
 mod library;
 mod player;
 
-use std::{
-    io::{self, Stdout},
-    panic,
-};
+use std::{io, panic};
 
 use anyhow::Result;
+use app::App;
 use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture},
+    event::{self, DisableMouseCapture, EnableMouseCapture},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use library::initialize_db;
-use player::Player;
+
 use ratatui::{backend::CrosstermBackend, Terminal};
-use rodio::OutputStream;
+
 use sqlx::Connection;
 
 #[tokio::main]
@@ -33,6 +32,14 @@ async fn main() -> Result<()> {
         })
         .await?;
     }
+
+    let mut app = App::new();
+
+    terminal.draw(|f| {
+        app.draw(f);
+    })?;
+
+    event::read()?;
 
     restore_terminal()?;
 
