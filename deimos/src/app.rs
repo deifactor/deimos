@@ -65,6 +65,8 @@ impl App {
         match code {
             KeyCode::Tab => self.focus = self.focus.next(),
             KeyCode::BackTab => self.focus = self.focus.prev(),
+            KeyCode::Down => self.focused_list().next(),
+            KeyCode::Up => self.focused_list().prev(),
             _ => (),
         }
     }
@@ -106,6 +108,14 @@ impl App {
         );
     }
 
+    fn focused_list(&mut self) -> &mut BrowseList {
+        match self.focus {
+            Focus::ArtistList => &mut self.artists,
+            Focus::AlbumList => &mut self.albums,
+            Focus::TrackList => &mut self.tracks,
+        }
+    }
+
     fn border_style(&self, is_focused: bool) -> Style {
         if is_focused {
             Style::default().fg(Color::LightRed)
@@ -127,6 +137,29 @@ impl BrowseList {
             items,
             state: ListState::default(),
         }
+    }
+    fn next(&mut self) {
+        if self.items.is_empty() {
+            return;
+        }
+        let i = match self.state.selected() {
+            Some(i) => (i + 1) % self.items.len(),
+            None => 0,
+        };
+        self.state.select(Some(i));
+    }
+
+    fn prev(&mut self) {
+        if self.items.is_empty() {
+            return;
+        }
+        let i = match self.state.selected() {
+            // separate to handle overflow
+            Some(0) => self.items.len() - 1,
+            Some(i) => (i - 1) % self.items.len(),
+            None => 0,
+        };
+        self.state.select(Some(i));
     }
 
     fn widget(&self) -> List<'static> {
