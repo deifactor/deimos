@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use sqlx::{
     pool::PoolConnection, sqlite::SqliteConnectOptions, Executor, Sqlite, SqlitePool, Transaction,
 };
-use std::{fs::File, os::unix::prelude::OsStrExt, path::Path};
+use std::{collections::HashMap, fs::File, os::unix::prelude::OsStrExt, path::Path};
 use symphonia::core::{
     io::MediaSourceStream,
     meta::{Metadata, StandardTagKey, Value},

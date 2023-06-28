@@ -1,25 +1,26 @@
 mod library;
 mod player;
 
+use std::{
+    io::{self, Stdout},
+    panic,
+};
+
 use anyhow::Result;
-use cursive::{
-    theme::Palette,
-    views::{Button, LinearLayout},
+use crossterm::{
+    event::{DisableMouseCapture, EnableMouseCapture},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use library::initialize_db;
 use player::Player;
+use ratatui::{backend::CrosstermBackend, Terminal};
 use rodio::OutputStream;
 use sqlx::Connection;
 
-fn palette() -> Palette {
-    use cursive::theme::{Color::*, PaletteColor::*};
-    let mut palette = Palette::default();
-    palette.extend(vec![(Background, TerminalDefault)]);
-    palette
-}
-
 #[tokio::main]
 async fn main() -> Result<()> {
+    let mut terminal = prepare_terminal()?;
     let mut conn = initialize_db("songs.sqlite").await?;
     let count = sqlx::query!("SELECT COUNT(*) AS count FROM songs")
         .fetch_one(&mut conn)
@@ -33,20 +34,38 @@ async fn main() -> Result<()> {
         .await?;
     }
 
-    let mut siv = cursive::default();
-    siv.with_theme(|theme| theme.palette = palette());
+    restore_terminal()?;
 
-    let (_stream, stream_handle) = OutputStream::try_default()?;
-    let player = Player::new(stream_handle)?;
+    Ok(())
+}
 
-    siv.add_layer(
-        LinearLayout::horizontal()
-            .child(Button::new("play", cc!(player, |_s| player.play())))
-            .child(Button::new("pause", cc!(player, |_s| player.pause())))
-            .child(Button::new("quit", |s| s.quit())),
-    );
+/// Sets up the terminal for full-screen application mode.
+///
+/// This also installs a panic hook that will (call the original panic hook
+/// and) clean up the terminal state, meaning that even a panic should leave
+/// your terminal workable.
+fn prepare_terminal() -> Result<Terminal<CrosstermBackend<io::Stdout>>> {
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let original = panic::take_hook();
+    // we have to restore the terminal *before* the original handler since any
+    // messages it prints will get eaten
+    panic::set_hook(Box::new(move |panic| {
+        restore_terminal().unwrap();
+        original(panic);
+    }));
+    let backend = CrosstermBackend::new(io::stdout());
+    let mut terminal = Terminal::new(backend)?;
+    terminal.clear()?;
+    Ok(terminal)
+}
 
-    siv.run();
+/// Cleans up the terminal state. prepare_terminal() will call this on panic,
+/// but you still need to manually call it too.
+fn restore_terminal() -> Result<()> {
+    disable_raw_mode()?;
+    execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
     Ok(())
 }
 
