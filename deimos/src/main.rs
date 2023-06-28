@@ -7,7 +7,7 @@ use std::{io, panic};
 use anyhow::Result;
 use app::App;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent},
+    event::{DisableMouseCapture, EnableMouseCapture, EventStream},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -15,39 +15,17 @@ use library::initialize_db;
 
 use ratatui::{backend::CrosstermBackend, Terminal};
 
-use sqlx::Connection;
+use tokio_stream::StreamExt;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut terminal = prepare_terminal()?;
-    let mut conn = initialize_db("songs.sqlite").await?;
-    let count = sqlx::query!("SELECT COUNT(*) AS count FROM songs")
-        .fetch_one(&mut conn)
-        .await?
-        .count;
-    // only reinitialize db if there are no songs
-    if count == 0 {
-        conn.transaction(|conn| {
-            Box::pin(async move { library::find_music("/home/vector/music", conn).await })
-        })
+    let terminal = prepare_terminal()?;
+    let pool = initialize_db("songs.sqlite").await?;
+
+    let app = App::new();
+
+    app.run(pool, EventStream::new().filter_map(|ev| ev.ok()), terminal)
         .await?;
-    }
-
-    let mut app = App::new();
-
-    loop {
-        terminal.draw(|f| {
-            app.draw(f);
-        })?;
-        let event = event::read()?;
-        match event {
-            Event::Key(KeyEvent {
-                code: KeyCode::Char('q') | KeyCode::Esc,
-                ..
-            }) => break,
-            _ => app.handle_event(event),
-        }
-    }
 
     restore_terminal()?;
 

@@ -1,7 +1,5 @@
 use anyhow::{anyhow, Result};
-use sqlx::{
-    pool::PoolConnection, sqlite::SqliteConnectOptions, Executor, Sqlite, SqlitePool, Transaction,
-};
+use sqlx::{sqlite::SqliteConnectOptions, Executor, Pool, Sqlite, SqlitePool, Transaction};
 use std::{fs::File, os::unix::prelude::OsStrExt, path::Path};
 use symphonia::core::{
     io::MediaSourceStream,
@@ -11,7 +9,7 @@ use symphonia::core::{
 use walkdir::WalkDir;
 
 /// Initialize the song database, creating all tables. This deletes any existing database.
-pub async fn initialize_db(path: impl AsRef<Path>) -> Result<PoolConnection<Sqlite>> {
+pub async fn initialize_db(path: impl AsRef<Path>) -> Result<Pool<Sqlite>> {
     let pool = SqlitePool::connect_with(
         SqliteConnectOptions::new()
             .filename(path)
@@ -20,7 +18,7 @@ pub async fn initialize_db(path: impl AsRef<Path>) -> Result<PoolConnection<Sqli
     .await?;
     let mut conn = pool.acquire().await?;
     sqlx::migrate!().run(&mut conn).await?;
-    Ok(conn)
+    Ok(pool)
 }
 
 pub async fn find_music(path: impl AsRef<Path>, conn: &mut Transaction<'_, Sqlite>) -> Result<()> {

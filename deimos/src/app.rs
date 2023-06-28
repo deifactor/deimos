@@ -1,3 +1,4 @@
+use anyhow::{bail, Result};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     backend::Backend,
@@ -5,8 +6,16 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
     widgets::{Block, Borders, List, ListItem, ListState},
-    Frame,
+    Frame, Terminal,
 };
+use sqlx::{pool::PoolConnection, Connection, Pool, Sqlite};
+use tokio::{
+    pin,
+    sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+};
+use tokio_stream::{wrappers::UnboundedReceiverStream, Stream, StreamExt};
+
+use crate::library;
 
 #[derive(Debug)]
 pub struct App {
@@ -17,6 +26,22 @@ pub struct App {
     /// Tracks in the current album.
     tracks: BrowseList,
     focus: Focus,
+
+    tx_event: UnboundedSender<AppEvent>,
+    rx_event: Option<UnboundedReceiver<AppEvent>>,
+}
+
+#[derive(Debug)]
+pub enum Message {
+    TerminalEvent(Event),
+    AppEvent(AppEvent),
+}
+
+#[derive(Debug)]
+pub enum AppEvent {
+    Refresh,
+    LibraryLoaded { artists: Vec<String> },
+    Quit,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -52,23 +77,66 @@ impl App {
         let artists: Vec<_> = (0..3).map(|x| format!("Artist {x}")).collect();
         let albums: Vec<_> = (0..3).map(|x| format!("Album {x}")).collect();
         let tracks: Vec<_> = (0..3).map(|x| format!("Track {x}")).collect();
+        let (tx_event, rx_event) = unbounded_channel();
         App {
             artists: BrowseList::new(artists),
             albums: BrowseList::new(albums),
             tracks: BrowseList::new(tracks),
             focus: Focus::ArtistList,
+            tx_event,
+            rx_event: Some(rx_event),
         }
     }
 
-    pub fn handle_event(&mut self, event: Event) {
-        let Event::Key(KeyEvent { code, kind: KeyEventKind::Press, .. }) = event else { return };
+    pub async fn run<B: Backend>(
+        mut self,
+        pool: Pool<Sqlite>,
+        terminal_events: impl Stream<Item = Event>,
+        mut terminal: Terminal<B>,
+    ) -> Result<()> {
+        let event_stream = terminal_events.map(Message::TerminalEvent).merge(
+            UnboundedReceiverStream::new(self.rx_event.take().unwrap()).map(Message::AppEvent),
+        );
+
+        let tx_event = self.tx_event.clone();
+        tokio::spawn(async move {
+            let conn = pool.acquire().await?;
+            load_library(conn, tx_event).await?;
+            anyhow::Ok(())
+        });
+
+        pin!(event_stream);
+        while let Some(ev) = (event_stream).next().await {
+            match ev {
+                Message::TerminalEvent(ev) => self.handle_terminal(ev)?,
+                Message::AppEvent(AppEvent::Quit) => break,
+                Message::AppEvent(ev) => self.handle_app(ev)?,
+            };
+            terminal.draw(|f| self.draw(f))?;
+        }
+        Ok(())
+    }
+
+    pub fn handle_terminal(&mut self, event: Event) -> Result<()> {
+        let Event::Key(KeyEvent { code, kind: KeyEventKind::Press, .. }) = event else { return Ok(()) };
         match code {
             KeyCode::Tab => self.focus = self.focus.next(),
             KeyCode::BackTab => self.focus = self.focus.prev(),
             KeyCode::Down => self.focused_list().next(),
             KeyCode::Up => self.focused_list().prev(),
+            KeyCode::Esc | KeyCode::Char('q') => self.tx_event.send(AppEvent::Quit)?,
             _ => (),
-        }
+        };
+        Ok(())
+    }
+
+    fn handle_app(&mut self, ev: AppEvent) -> Result<()> {
+        match ev {
+            AppEvent::Refresh => (),
+            AppEvent::LibraryLoaded { artists } => self.artists.items = artists,
+            AppEvent::Quit => bail!("we should have quit already"),
+        };
+        Ok(())
     }
 
     pub fn draw<B: Backend>(&mut self, f: &mut Frame<'_, B>) {
@@ -123,6 +191,30 @@ impl App {
             Style::default()
         }
     }
+}
+
+async fn load_library(
+    mut conn: PoolConnection<Sqlite>,
+    tx: UnboundedSender<AppEvent>,
+) -> Result<()> {
+    let count = sqlx::query!("SELECT COUNT(*) AS count FROM songs")
+        .fetch_one(&mut conn)
+        .await?
+        .count;
+    // only reinitialize db if there are no songs
+    if count == 0 {
+        conn.transaction(|conn| {
+            Box::pin(async move { library::find_music("/home/vector/music", conn).await })
+        })
+        .await?;
+    }
+    let artists = sqlx::query_scalar!(
+        r#"SELECT DISTINCT artist AS "artist!" FROM songs WHERE artist IS NOT NULL"#
+    )
+    .fetch_all(&mut conn)
+    .await?;
+    tx.send(AppEvent::LibraryLoaded { artists })?;
+    Ok(())
 }
 
 #[derive(Debug)]

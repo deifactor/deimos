@@ -1,7 +1,7 @@
 CREATE TABLE songs (
   song_id INTEGER PRIMARY KEY,
-  path STRING,
-  title STRING,
-  album STRING,
-  artist STRING
+  path TEXT,
+  title TEXT,
+  album TEXT,
+  artist TEXT
 );
