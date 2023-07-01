@@ -11,24 +11,24 @@ use ratatui::{
 use sqlx::{pool::PoolConnection, Connection, Pool, Sqlite};
 use tokio::{
     pin,
-    sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+    sync::mpsc::{unbounded_channel, UnboundedSender},
 };
-use tokio_stream::{wrappers::UnboundedReceiverStream, Stream, StreamExt};
+use tokio_stream::{Stream, StreamExt};
 
-use crate::library;
+use crate::{
+    action::{self, spawn_executor, Action, LoadLibrary},
+    library,
+};
 
 #[derive(Debug)]
 pub struct App {
     /// Currently-visible artists.
-    artists: BrowseList,
+    pub artists: BrowseList,
     /// Albums for the current artist.
-    albums: BrowseList,
+    pub albums: BrowseList,
     /// Tracks in the current album.
-    tracks: BrowseList,
-    focus: Focus,
-
-    tx_event: UnboundedSender<AppEvent>,
-    rx_event: Option<UnboundedReceiver<AppEvent>>,
+    pub tracks: BrowseList,
+    pub focus: MainList,
 }
 
 #[derive(Debug)]
@@ -46,28 +46,28 @@ pub enum AppEvent {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[allow(clippy::enum_variant_names)]
-pub enum Focus {
-    ArtistList,
-    AlbumList,
-    TrackList,
+pub enum MainList {
+    Artist,
+    Album,
+    Track,
 }
 
-impl Focus {
-    fn next(self) -> Self {
-        use Focus::*;
+impl MainList {
+    pub fn next(self) -> Self {
+        use MainList::*;
         match self {
-            ArtistList => AlbumList,
-            AlbumList => TrackList,
-            TrackList => ArtistList,
+            Artist => Album,
+            Album => Track,
+            Track => Artist,
         }
     }
 
-    fn prev(self) -> Self {
-        use Focus::*;
+    pub fn prev(self) -> Self {
+        use MainList::*;
         match self {
-            ArtistList => TrackList,
-            AlbumList => ArtistList,
-            TrackList => AlbumList,
+            Artist => Track,
+            Album => Artist,
+            Track => Album,
         }
     }
 }
@@ -77,66 +77,36 @@ impl App {
         let artists: Vec<_> = (0..3).map(|x| format!("Artist {x}")).collect();
         let albums: Vec<_> = (0..3).map(|x| format!("Album {x}")).collect();
         let tracks: Vec<_> = (0..3).map(|x| format!("Track {x}")).collect();
-        let (tx_event, rx_event) = unbounded_channel();
         App {
             artists: BrowseList::new(artists),
             albums: BrowseList::new(albums),
             tracks: BrowseList::new(tracks),
-            focus: Focus::ArtistList,
-            tx_event,
-            rx_event: Some(rx_event),
+            focus: MainList::Artist,
         }
     }
 
     pub async fn run<B: Backend>(
         mut self,
         pool: Pool<Sqlite>,
-        terminal_events: impl Stream<Item = Event>,
+        terminal_events: impl Stream<Item = Event> + Send + Sync + 'static,
         mut terminal: Terminal<B>,
     ) -> Result<()> {
-        let event_stream = terminal_events.map(Message::TerminalEvent).merge(
-            UnboundedReceiverStream::new(self.rx_event.take().unwrap()).map(Message::AppEvent),
-        );
+        let (tx_action, mut rx_action) = unbounded_channel::<Box<dyn Action>>();
+        let sender = spawn_executor(pool.clone(), tx_action.clone());
+        sender.send(LoadLibrary)?;
+        pin!(terminal_events);
 
-        let tx_event = self.tx_event.clone();
-        tokio::spawn(async move {
-            let conn = pool.acquire().await?;
-            load_library(conn, tx_event).await?;
-            anyhow::Ok(())
-        });
-
-        pin!(event_stream);
-        while let Some(ev) = (event_stream).next().await {
-            match ev {
-                Message::TerminalEvent(ev) => self.handle_terminal(ev)?,
-                Message::AppEvent(AppEvent::Quit) => break,
-                Message::AppEvent(ev) => self.handle_app(ev)?,
-            };
+        loop {
+            tokio::select! {
+                Some(ev) = terminal_events.next() =>
+                if let Some(action) = self.terminal_to_action(ev) {
+                    tx_action.send(action)?;
+                },
+                Some(mut action) = rx_action.recv() =>
+                { action.dispatch(&mut self, &sender)?; }
+            }
             terminal.draw(|f| self.draw(f))?;
         }
-        Ok(())
-    }
-
-    pub fn handle_terminal(&mut self, event: Event) -> Result<()> {
-        let Event::Key(KeyEvent { code, kind: KeyEventKind::Press, .. }) = event else { return Ok(()) };
-        match code {
-            KeyCode::Tab => self.focus = self.focus.next(),
-            KeyCode::BackTab => self.focus = self.focus.prev(),
-            KeyCode::Down => self.focused_list().next(),
-            KeyCode::Up => self.focused_list().prev(),
-            KeyCode::Esc | KeyCode::Char('q') => self.tx_event.send(AppEvent::Quit)?,
-            _ => (),
-        };
-        Ok(())
-    }
-
-    fn handle_app(&mut self, ev: AppEvent) -> Result<()> {
-        match ev {
-            AppEvent::Refresh => (),
-            AppEvent::LibraryLoaded { artists } => self.artists.items = artists,
-            AppEvent::Quit => bail!("we should have quit already"),
-        };
-        Ok(())
     }
 
     pub fn draw<B: Backend>(&mut self, f: &mut Frame<'_, B>) {
@@ -149,7 +119,7 @@ impl App {
                 Block::default()
                     .title("Artists")
                     .borders(border!(TOP, BOTTOM, LEFT))
-                    .border_style(self.border_style(self.focus == Focus::ArtistList)),
+                    .border_style(self.border_style(self.focus == MainList::Artist)),
             ),
             chunks[0],
             &mut self.artists.state,
@@ -159,7 +129,7 @@ impl App {
                 Block::default()
                     .title("Albums")
                     .borders(border!(TOP, BOTTOM, LEFT))
-                    .border_style(self.border_style(self.focus == Focus::AlbumList)),
+                    .border_style(self.border_style(self.focus == MainList::Album)),
             ),
             chunks[1],
             &mut self.albums.state,
@@ -169,7 +139,7 @@ impl App {
                 Block::default()
                     .borders(Borders::ALL)
                     .title("Tracks")
-                    .border_style(self.border_style(self.focus == Focus::TrackList)),
+                    .border_style(self.border_style(self.focus == MainList::Track)),
             ),
             chunks[2],
             &mut self.tracks.state,
@@ -178,9 +148,9 @@ impl App {
 
     fn focused_list(&mut self) -> &mut BrowseList {
         match self.focus {
-            Focus::ArtistList => &mut self.artists,
-            Focus::AlbumList => &mut self.albums,
-            Focus::TrackList => &mut self.tracks,
+            MainList::Artist => &mut self.artists,
+            MainList::Album => &mut self.albums,
+            MainList::Track => &mut self.tracks,
         }
     }
 
@@ -190,6 +160,17 @@ impl App {
         } else {
             Style::default()
         }
+    }
+
+    fn terminal_to_action(&self, ev: Event) -> Option<Box<dyn Action>> {
+        let Event::Key(KeyEvent { code, kind: KeyEventKind::Press, .. }) = ev else { return None };
+        let action: Box<dyn Action> = match code {
+            KeyCode::Tab => Box::new(action::NextFocus) as Box<dyn Action>,
+            KeyCode::Esc | KeyCode::Char('q') => Box::new(action::Quit) as Box<dyn Action>,
+            KeyCode::Down => Box::new(action::NextList) as Box<dyn Action>,
+            _ => return None,
+        };
+        Some(action)
     }
 }
 
@@ -218,19 +199,19 @@ async fn load_library(
 }
 
 #[derive(Debug)]
-struct BrowseList {
-    items: Vec<String>,
-    state: ListState,
+pub struct BrowseList {
+    pub items: Vec<String>,
+    pub state: ListState,
 }
 
 impl BrowseList {
-    fn new(items: Vec<String>) -> Self {
+    pub fn new(items: Vec<String>) -> Self {
         Self {
             items,
             state: ListState::default(),
         }
     }
-    fn next(&mut self) {
+    pub fn next(&mut self) {
         if self.items.is_empty() {
             return;
         }
@@ -241,7 +222,7 @@ impl BrowseList {
         self.state.select(Some(i));
     }
 
-    fn prev(&mut self) {
+    pub fn prev(&mut self) {
         if self.items.is_empty() {
             return;
         }
@@ -254,7 +235,7 @@ impl BrowseList {
         self.state.select(Some(i));
     }
 
-    fn widget(&self) -> List<'static> {
+    pub fn widget(&self) -> List<'static> {
         let items: Vec<_> = self
             .items
             .iter()

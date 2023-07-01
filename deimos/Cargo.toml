@@ -8,6 +8,7 @@ repository = "http://github.com/deifactor/deimos"
 
 [dependencies]
 anyhow = { version = "1.0.71", features = ["backtrace"] }
+async-trait = "0.1.68"
 crossbeam = "0.8.2"
 crossterm = { version = "0.26.1", features = ["event-stream"] }
 ratatui = { version = "0.21.0", features = ["macros"] }
