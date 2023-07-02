@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
     backend::Backend,
@@ -16,7 +16,7 @@ use tokio::{
 use tokio_stream::{Stream, StreamExt};
 
 use crate::{
-    action::{self, spawn_executor, Action, LoadLibrary},
+    action::{Action, Command},
     library,
 };
 
@@ -91,9 +91,9 @@ impl App {
         terminal_events: impl Stream<Item = Event> + Send + Sync + 'static,
         mut terminal: Terminal<B>,
     ) -> Result<()> {
-        let (tx_action, mut rx_action) = unbounded_channel::<Box<dyn Action>>();
-        let sender = spawn_executor(pool.clone(), tx_action.clone());
-        sender.send(LoadLibrary)?;
+        let (tx_action, mut rx_action) = unbounded_channel::<Action>();
+        let sender = Command::spawn_executor(pool.clone(), tx_action.clone());
+        sender.send(Command::LoadLibrary)?;
         pin!(terminal_events);
 
         loop {
@@ -102,7 +102,7 @@ impl App {
                 if let Some(action) = self.terminal_to_action(ev) {
                     tx_action.send(action)?;
                 },
-                Some(mut action) = rx_action.recv() =>
+                Some(action) = rx_action.recv() =>
                 { action.dispatch(&mut self, &sender)?; }
             }
             terminal.draw(|f| self.draw(f))?;
@@ -162,40 +162,17 @@ impl App {
         }
     }
 
-    fn terminal_to_action(&self, ev: Event) -> Option<Box<dyn Action>> {
+    fn terminal_to_action(&self, ev: Event) -> Option<Action> {
         let Event::Key(KeyEvent { code, kind: KeyEventKind::Press, .. }) = ev else { return None };
-        let action: Box<dyn Action> = match code {
-            KeyCode::Tab => Box::new(action::NextFocus) as Box<dyn Action>,
-            KeyCode::Esc | KeyCode::Char('q') => Box::new(action::Quit) as Box<dyn Action>,
-            KeyCode::Down => Box::new(action::NextList) as Box<dyn Action>,
+        use Action::*;
+        let action = match code {
+            KeyCode::Tab => NextFocus,
+            KeyCode::Esc | KeyCode::Char('q') => Quit,
+            KeyCode::Down => NextList,
             _ => return None,
         };
         Some(action)
     }
-}
-
-async fn load_library(
-    mut conn: PoolConnection<Sqlite>,
-    tx: UnboundedSender<AppEvent>,
-) -> Result<()> {
-    let count = sqlx::query!("SELECT COUNT(*) AS count FROM songs")
-        .fetch_one(&mut conn)
-        .await?
-        .count;
-    // only reinitialize db if there are no songs
-    if count == 0 {
-        conn.transaction(|conn| {
-            Box::pin(async move { library::find_music("/home/vector/music", conn).await })
-        })
-        .await?;
-    }
-    let artists = sqlx::query_scalar!(
-        r#"SELECT DISTINCT artist AS "artist!" FROM songs WHERE artist IS NOT NULL"#
-    )
-    .fetch_all(&mut conn)
-    .await?;
-    tx.send(AppEvent::LibraryLoaded { artists })?;
-    Ok(())
 }
 
 #[derive(Debug)]
