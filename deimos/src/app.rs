@@ -8,17 +8,11 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState},
     Frame, Terminal,
 };
-use sqlx::{pool::PoolConnection, Connection, Pool, Sqlite};
-use tokio::{
-    pin,
-    sync::mpsc::{unbounded_channel, UnboundedSender},
-};
+use sqlx::{Pool, Sqlite};
+use tokio::{pin, sync::mpsc::unbounded_channel};
 use tokio_stream::{Stream, StreamExt};
 
-use crate::{
-    action::{Action, Command},
-    library,
-};
+use crate::action::{Action, Command};
 
 #[derive(Debug)]
 pub struct App {
@@ -29,19 +23,6 @@ pub struct App {
     /// Tracks in the current album.
     pub tracks: BrowseList,
     pub focus: MainList,
-}
-
-#[derive(Debug)]
-pub enum Message {
-    TerminalEvent(Event),
-    AppEvent(AppEvent),
-}
-
-#[derive(Debug)]
-pub enum AppEvent {
-    Refresh,
-    LibraryLoaded { artists: Vec<String> },
-    Quit,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
