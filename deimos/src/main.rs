@@ -1,5 +1,6 @@
 mod action;
 mod app;
+mod artist_album_list;
 mod library;
 mod player;
 

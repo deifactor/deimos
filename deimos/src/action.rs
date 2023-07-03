@@ -6,14 +6,15 @@
 /// - We don't have to box them all the time (performance doesn't matter, but it's verbose)
 /// - We can make their methods take them by move (can't call a by-move method on a boxed trait object)
 /// - Less verbose to declare a new action
-use std::fmt::Debug;
+use std::{collections::HashMap, fmt::Debug};
 
 use anyhow::Result;
+use itertools::Itertools;
 use ratatui::widgets::ListState;
 use sqlx::{Connection, Pool, Sqlite};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 
-use crate::{app::App, library};
+use crate::{app::App, artist_album_list::ArtistAlbumList, library};
 
 /// An [`Action`] corresponds to a mutation of the application state. Actions
 /// are semantic. For example, 'the user pressed the n key' is not a good
@@ -23,8 +24,7 @@ use crate::{app::App, library};
 pub enum Action {
     NextFocus,
     NextList,
-    SetArtists(Vec<String>),
-    SetAlbums(Vec<String>),
+    SetArtists(HashMap<String, Vec<String>>),
     Quit,
 }
 
@@ -32,21 +32,9 @@ impl Action {
     pub fn dispatch(self, app: &mut App, sender: &UnboundedSender<Command>) -> Result<()> {
         use Action::*;
         match self {
-            NextFocus => app.focus = app.focus.next(),
-            NextList => {
-                app.artists.next();
-                sender.send(Command::LoadAlbums {
-                    artist: app.artists.items[app.artists.state.selected().unwrap()].clone(),
-                })?;
-            }
-            SetArtists(artists) => {
-                app.artists.items = artists;
-                app.artists.state = ListState::default();
-            }
-            SetAlbums(albums) => {
-                app.albums.items = albums;
-                app.albums.state = ListState::default();
-            }
+            NextList => app.artist_album_list.next(),
+            SetArtists(artists) => app.artist_album_list = ArtistAlbumList::new(artists),
+            NextFocus => (),
             Quit => panic!("bye"),
         }
         Ok(())
@@ -58,7 +46,6 @@ impl Action {
 /// the database should both be done through a [`Command`].
 #[derive(Debug)]
 pub enum Command {
-    LoadAlbums { artist: String },
     LoadLibrary,
 }
 
@@ -66,15 +53,6 @@ impl Command {
     async fn execute(self, pool: &Pool<Sqlite>) -> Result<Option<Action>> {
         use Command::*;
         let action = match self {
-            LoadAlbums { artist } => {
-                let mut conn = pool.acquire().await?;
-                let albums = sqlx::query_scalar!(r#"SELECT DISTINCT album AS "album!" FROM songs WHERE artist = ? AND album IS NOT NULL ORDER BY album DESC"#,
-        artist)
-            .fetch_all(&mut conn)
-            .await?;
-                Some(Action::SetAlbums(albums))
-            }
-
             LoadLibrary => {
                 let mut conn = pool.acquire().await?;
                 let count = sqlx::query!("SELECT COUNT(*) AS count FROM songs")
@@ -90,11 +68,17 @@ impl Command {
                     })
                     .await?;
                 }
-                let artists = sqlx::query_scalar!(
-                    r#"SELECT DISTINCT artist AS "artist!" FROM songs WHERE artist IS NOT NULL"#
+
+                let mut artists: HashMap<String, Vec<String>> = HashMap::new();
+                sqlx::query!(
+                    r#"SELECT DISTINCT artist AS "artist!", album AS "album!"
+                       FROM songs WHERE artist IS NOT NULL AND album IS NOT NULL
+                       ORDER BY artist, album"#
                 )
                 .fetch_all(&mut conn)
-                .await?;
+                .await?
+                .into_iter()
+                .for_each(|row| artists.entry(row.artist).or_default().push(row.album));
                 Some(Action::SetArtists(artists))
             }
         };

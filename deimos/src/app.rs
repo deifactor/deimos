@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
@@ -8,61 +10,24 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState},
     Frame, Terminal,
 };
-use sqlx::{Pool, Sqlite};
+use sqlx::{pool::PoolConnection, Pool, Sqlite};
 use tokio::{pin, sync::mpsc::unbounded_channel};
 use tokio_stream::{Stream, StreamExt};
 
-use crate::action::{Action, Command};
+use crate::{
+    action::{Action, Command},
+    artist_album_list::{ArtistAlbumList, ArtistAlbumListState},
+};
 
 #[derive(Debug)]
 pub struct App {
-    /// Currently-visible artists.
-    pub artists: BrowseList,
-    /// Albums for the current artist.
-    pub albums: BrowseList,
-    /// Tracks in the current album.
-    pub tracks: BrowseList,
-    pub focus: MainList,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[allow(clippy::enum_variant_names)]
-pub enum MainList {
-    Artist,
-    Album,
-    Track,
-}
-
-impl MainList {
-    pub fn next(self) -> Self {
-        use MainList::*;
-        match self {
-            Artist => Album,
-            Album => Track,
-            Track => Artist,
-        }
-    }
-
-    pub fn prev(self) -> Self {
-        use MainList::*;
-        match self {
-            Artist => Track,
-            Album => Artist,
-            Track => Album,
-        }
-    }
+    pub artist_album_list: ArtistAlbumList,
 }
 
 impl App {
     pub fn new() -> Self {
-        let artists: Vec<_> = (0..3).map(|x| format!("Artist {x}")).collect();
-        let albums: Vec<_> = (0..3).map(|x| format!("Album {x}")).collect();
-        let tracks: Vec<_> = (0..3).map(|x| format!("Track {x}")).collect();
         App {
-            artists: BrowseList::new(artists),
-            albums: BrowseList::new(albums),
-            tracks: BrowseList::new(tracks),
-            focus: MainList::Artist,
+            artist_album_list: ArtistAlbumList::default(),
         }
     }
 
@@ -91,56 +56,7 @@ impl App {
     }
 
     pub fn draw<B: Backend>(&mut self, f: &mut Frame<'_, B>) {
-        let chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Ratio(1, 3); 3])
-            .split(f.size());
-        f.render_stateful_widget(
-            self.artists.widget().block(
-                Block::default()
-                    .title("Artists")
-                    .borders(border!(TOP, BOTTOM, LEFT))
-                    .border_style(self.border_style(self.focus == MainList::Artist)),
-            ),
-            chunks[0],
-            &mut self.artists.state,
-        );
-        f.render_stateful_widget(
-            self.albums.widget().block(
-                Block::default()
-                    .title("Albums")
-                    .borders(border!(TOP, BOTTOM, LEFT))
-                    .border_style(self.border_style(self.focus == MainList::Album)),
-            ),
-            chunks[1],
-            &mut self.albums.state,
-        );
-        f.render_stateful_widget(
-            self.tracks.widget().block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title("Tracks")
-                    .border_style(self.border_style(self.focus == MainList::Track)),
-            ),
-            chunks[2],
-            &mut self.tracks.state,
-        );
-    }
-
-    fn focused_list(&mut self) -> &mut BrowseList {
-        match self.focus {
-            MainList::Artist => &mut self.artists,
-            MainList::Album => &mut self.albums,
-            MainList::Track => &mut self.tracks,
-        }
-    }
-
-    fn border_style(&self, is_focused: bool) -> Style {
-        if is_focused {
-            Style::default().fg(Color::LightRed)
-        } else {
-            Style::default()
-        }
+        self.artist_album_list.draw(f, f.size());
     }
 
     fn terminal_to_action(&self, ev: Event) -> Option<Action> {
@@ -153,52 +69,5 @@ impl App {
             _ => return None,
         };
         Some(action)
-    }
-}
-
-#[derive(Debug)]
-pub struct BrowseList {
-    pub items: Vec<String>,
-    pub state: ListState,
-}
-
-impl BrowseList {
-    pub fn new(items: Vec<String>) -> Self {
-        Self {
-            items,
-            state: ListState::default(),
-        }
-    }
-    pub fn next(&mut self) {
-        if self.items.is_empty() {
-            return;
-        }
-        let i = match self.state.selected() {
-            Some(i) => (i + 1) % self.items.len(),
-            None => 0,
-        };
-        self.state.select(Some(i));
-    }
-
-    pub fn prev(&mut self) {
-        if self.items.is_empty() {
-            return;
-        }
-        let i = match self.state.selected() {
-            // separate to handle overflow
-            Some(0) => self.items.len() - 1,
-            Some(i) => (i - 1) % self.items.len(),
-            None => 0,
-        };
-        self.state.select(Some(i));
-    }
-
-    pub fn widget(&self) -> List<'static> {
-        let items: Vec<_> = self
-            .items
-            .iter()
-            .map(|text| ListItem::new(text.to_owned()))
-            .collect();
-        List::new(items).highlight_style(Style::default().fg(Color::Red))
     }
 }
