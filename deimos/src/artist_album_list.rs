@@ -58,6 +58,7 @@ impl ArtistAlbumList {
         list
     }
 
+    /// Move to the next selection.
     pub fn next(&mut self) {
         if self.artists.is_empty() {
             return;
@@ -68,6 +69,7 @@ impl ArtistAlbumList {
         };
     }
 
+    /// Toggles whether the currently selected artist is expanded. Adjusts the selection as necessary.
     pub fn toggle(&mut self) {
         let Some(selected) = self.selected else { return; };
         let RowIndex { artist, .. } = self.rows[selected];
