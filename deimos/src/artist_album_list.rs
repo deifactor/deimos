@@ -22,19 +22,6 @@ struct RowIndex {
     album: Option<usize>,
 }
 
-/// State stored between renders of the [`ArtistAlbumList`].
-#[derive(Debug, Default)]
-pub struct ArtistAlbumListState {
-    /// Number of lines to scroll down when rendering.
-    offset: usize,
-    /// The offset of the selected item, if any.
-    selected: Option<usize>,
-    /// Whether or not the artist is expanded.
-    expanded: HashSet<usize>,
-    /// A flat list of all currently visible items.
-    rows: Vec<RowIndex>,
-}
-
 /// By default, an [`ArtistAlbumList`] justs lists the artists; however, if an
 /// artist is expanded, it also lists their albums. The list allows selecting
 /// either an artist *or* an album.
@@ -43,7 +30,15 @@ pub struct ArtistAlbumList {
     artists: Vec<ArtistItem>,
 
     highlight_style: Style,
-    state: ArtistAlbumListState,
+
+    /// Number of lines to scroll down when rendering.
+    offset: usize,
+    /// The offset of the selected item, if any.
+    selected: Option<usize>,
+    /// Whether or not the artist is expanded.
+    expanded: HashSet<usize>,
+    /// A flat list of all currently visible items.
+    rows: Vec<RowIndex>,
 }
 
 /// Methods for manipulating the state
@@ -57,7 +52,7 @@ impl ArtistAlbumList {
         let mut list = Self {
             artists,
             highlight_style: Style::default().fg(Color::Cyan).bg(Color::Rgb(30, 30, 30)),
-            state: ArtistAlbumListState::default(),
+            ..Default::default()
         };
         list.recompute_rows();
         list
@@ -67,28 +62,28 @@ impl ArtistAlbumList {
         if self.artists.is_empty() {
             return;
         }
-        self.state.selected = match self.state.selected {
-            Some(selected) => Some((selected + 1).min(self.state.rows.len())),
+        self.selected = match self.selected {
+            Some(selected) => Some((selected + 1).min(self.rows.len())),
             None => Some(0),
         };
     }
 
     pub fn toggle(&mut self) {
-        let Some(selected) = self.state.selected else { return; };
-        let RowIndex { artist, .. } = self.state.rows[selected];
-        if self.state.expanded.contains(&artist) {
-            self.state.expanded.remove(&artist);
+        let Some(selected) = self.selected else { return; };
+        let RowIndex { artist, .. } = self.rows[selected];
+        if self.expanded.contains(&artist) {
+            self.expanded.remove(&artist);
             self.recompute_rows();
             // move the selection to point at the artist, since we just closed it
-            self.state.selected = self.state.rows.iter().position(|row| row.artist == artist);
+            self.selected = self.rows.iter().position(|row| row.artist == artist);
         } else {
-            self.state.expanded.insert(artist);
+            self.expanded.insert(artist);
             self.recompute_rows();
         }
     }
 
     fn recompute_rows(&mut self) {
-        self.state.rows = self
+        self.rows = self
             .artists
             .iter()
             .enumerate()
@@ -97,7 +92,7 @@ impl ArtistAlbumList {
                     artist: artist_index,
                     album: None,
                 }];
-                if self.state.expanded.contains(&artist_index) {
+                if self.expanded.contains(&artist_index) {
                     rows.extend((0..item.albums.len()).map(|album_idx| RowIndex {
                         artist: artist_index,
                         album: Some(album_idx),
@@ -124,19 +119,18 @@ impl ArtistAlbumList {
         }
 
         for (index, row) in self
-            .state
             .rows
             .iter()
             .enumerate()
-            .skip(self.state.offset)
+            .skip(self.offset)
             .take(inner.height.into())
         {
-            let style = if self.state.selected == Some(index) {
+            let style = if self.selected == Some(index) {
                 self.highlight_style
             } else {
                 Style::default()
             };
-            let y = index - self.state.offset;
+            let y = index - self.offset;
             let mut text = self.text(*row);
             // need to manually truncate; setting the wrap to `trim: true` will also trim leading whitespace
             text.truncate(inner.width as usize);
