@@ -106,7 +106,7 @@ impl ArtistAlbumList {
 
 /// Drawing code
 impl ArtistAlbumList {
-    pub fn draw<B: Backend>(&self, frame: &mut Frame<B>, area: Rect) {
+    pub fn draw<B: Backend>(&mut self, frame: &mut Frame<B>, area: Rect) {
         let block = Block::default()
             .title("Artist / Album")
             .borders(Borders::ALL);
@@ -116,6 +116,12 @@ impl ArtistAlbumList {
         if inner.width < 1 || inner.height < 1 || self.artists.is_empty() {
             // nothing to do
             return;
+        }
+
+        if let Some(selected) = self.selected {
+            self.offset = self
+                .offset
+                .max(selected.saturating_sub(inner.height.saturating_sub(3) as usize));
         }
 
         for (index, row) in self
