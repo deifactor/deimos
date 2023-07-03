@@ -39,8 +39,13 @@ impl App {
                 if let Some(action) = self.terminal_to_action(ev) {
                     tx_action.send(action)?;
                 },
-                Some(action) = rx_action.recv() =>
-                { action.dispatch(&mut self, &sender)?; }
+                Some(action) = rx_action.recv() => {
+                    if action == Action::Quit {
+                        return Ok(())
+                    } else {
+                        action.dispatch(&mut self, &sender)?;
+                    }
+                }
             }
             terminal.draw(|f| self.draw(f))?;
         }

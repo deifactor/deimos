@@ -19,7 +19,7 @@ use crate::{app::App, artist_album_list::ArtistAlbumList, library};
 /// are semantic. For example, 'the user pressed the n key' is not a good
 /// choice for an action, but 'the user wants to advance in the current list'
 /// and 'the user input an n into the current text entry' are both good
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Action {
     NextFocus,
     NextList,
