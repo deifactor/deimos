@@ -28,9 +28,11 @@ pub struct ArtistAlbumListState {
     /// Number of lines to scroll down when rendering.
     offset: usize,
     /// The offset of the selected item, if any.
-    selected: Option<RowIndex>,
+    selected: Option<usize>,
     /// Whether or not the artist is expanded.
     expanded: HashSet<usize>,
+    /// A flat list of all currently visible items.
+    rows: Vec<RowIndex>,
 }
 
 /// By default, an [`ArtistAlbumList`] justs lists the artists; however, if an
@@ -52,120 +54,63 @@ impl ArtistAlbumList {
             .map(|(artist, albums)| ArtistItem { artist, albums })
             .collect_vec();
         artists.sort_unstable_by_key(|item| item.artist.clone());
-        Self {
+        let mut list = Self {
             artists,
             highlight_style: Style::default().fg(Color::Cyan).bg(Color::Rgb(30, 30, 30)),
             state: ArtistAlbumListState::default(),
-        }
+        };
+        list.recompute_rows();
+        list
     }
 
     pub fn next(&mut self) {
         if self.artists.is_empty() {
             return;
         }
-        let Some(selected) = self.state.selected else {
-            self.state.selected = Some(RowIndex { artist: 0, album: None });
-            return;
+        self.state.selected = match self.state.selected {
+            Some(selected) => Some((selected + 1).min(self.state.rows.len())),
+            None => Some(0),
         };
-
-        if !self.state.expanded.contains(&selected.artist) {
-            self.state.selected = Some(RowIndex {
-                artist: (selected.artist + 1).min(self.artists.len()),
-                album: None,
-            });
-            return;
-        }
-
-        let selection = match self.state.selected {
-            Some(RowIndex {
-                artist,
-                album: None,
-            }) => RowIndex {
-                artist,
-                album: Some(0),
-            },
-            Some(RowIndex {
-                artist,
-                album: Some(album),
-            }) => {
-                if album + 1 < self.artists[artist].albums.len() {
-                    RowIndex {
-                        artist,
-                        album: Some(album + 1),
-                    }
-                } else if artist + 1 < self.artists.len() {
-                    RowIndex {
-                        artist: artist + 1,
-                        album: None,
-                    }
-                } else {
-                    RowIndex {
-                        artist,
-                        album: Some(album),
-                    }
-                }
-            }
-            None => RowIndex {
-                artist: 0,
-                album: None,
-            },
-        };
-        self.state.selected = Some(selection);
     }
 
     pub fn toggle(&mut self) {
-        let Some(RowIndex { artist, .. }) = self.state.selected else { return; };
+        let Some(selected) = self.state.selected else { return; };
+        let RowIndex { artist, .. } = self.state.rows[selected];
         if self.state.expanded.contains(&artist) {
             self.state.expanded.remove(&artist);
-            self.state.selected = Some(RowIndex {
-                artist,
-                album: None,
-            });
+            self.recompute_rows();
+            // move the selection to point at the artist, since we just closed it
+            self.state.selected = self.state.rows.iter().position(|row| row.artist == artist);
         } else {
             self.state.expanded.insert(artist);
+            self.recompute_rows();
         }
     }
-}
 
-#[derive(Debug)]
-struct Row {
-    text: String,
-    index: RowIndex,
+    fn recompute_rows(&mut self) {
+        self.state.rows = self
+            .artists
+            .iter()
+            .enumerate()
+            .flat_map(|(artist_index, item)| {
+                let mut rows = vec![RowIndex {
+                    artist: artist_index,
+                    album: None,
+                }];
+                if self.state.expanded.contains(&artist_index) {
+                    rows.extend((0..item.albums.len()).map(|album_idx| RowIndex {
+                        artist: artist_index,
+                        album: Some(album_idx),
+                    }));
+                }
+                rows.into_iter()
+            })
+            .collect();
+    }
 }
 
 /// Drawing code
 impl ArtistAlbumList {
-    fn rows(&self) -> impl Iterator<Item = Row> + '_ {
-        self.artists
-            .iter()
-            .enumerate()
-            .flat_map(move |(artist_index, item)| {
-                let mut rows = vec![Row {
-                    text: item.artist.clone(),
-                    index: RowIndex {
-                        artist: artist_index,
-                        album: None,
-                    },
-                }];
-                if self.state.expanded.contains(&artist_index) {
-                    rows.extend(
-                        item.albums
-                            .iter()
-                            .enumerate()
-                            .map(|(album_idx, album)| Row {
-                                text: format!("    {album}"),
-                                index: RowIndex {
-                                    artist: artist_index,
-                                    album: Some(album_idx),
-                                },
-                            }),
-                    );
-                }
-                rows.into_iter()
-            })
-            .skip(self.state.offset)
-    }
-
     pub fn draw<B: Backend>(&self, frame: &mut Frame<B>, area: Rect) {
         let block = Block::default()
             .title("Artist / Album")
@@ -178,18 +123,36 @@ impl ArtistAlbumList {
             return;
         }
 
-        for (y, Row { mut text, index }) in self.rows().take(inner.height.into()).enumerate() {
+        for (index, row) in self
+            .state
+            .rows
+            .iter()
+            .enumerate()
+            .skip(self.state.offset)
+            .take(inner.height.into())
+        {
             let style = if self.state.selected == Some(index) {
                 self.highlight_style
             } else {
                 Style::default()
             };
+            let y = index - self.state.offset;
+            let mut text = self.text(*row);
             // need to manually truncate; setting the wrap to `trim: true` will also trim leading whitespace
             text.truncate(inner.width as usize);
             frame.render_widget(
                 Paragraph::new(text).style(style),
                 Rect::new(inner.left(), inner.top() + y as u16, inner.width, 1),
             );
+        }
+    }
+
+    /// Text to use when drawing the given row.
+    fn text(&self, row: RowIndex) -> String {
+        let artist = &self.artists[row.artist];
+        match row.album {
+            Some(album) => format!("    {}", artist.albums[album]),
+            None => artist.artist.clone(),
         }
     }
 }

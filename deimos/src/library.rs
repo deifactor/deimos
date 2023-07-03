@@ -61,7 +61,12 @@ async fn insert_song(
         match (tag.std_key, &tag.value) {
             (Some(TrackTitle), Value::String(s)) => title = Some(s.clone()),
             (Some(Album), Value::String(s)) => album = Some(s.clone()),
-            (Some(Artist), Value::String(s)) => artist = Some(s.clone()),
+            (Some(AlbumArtist), Value::String(s)) => artist = Some(s.clone()),
+            (Some(Artist), Value::String(s)) => {
+                if artist.is_none() {
+                    artist = Some(s.clone())
+                }
+            }
             _ => (),
         }
     }
