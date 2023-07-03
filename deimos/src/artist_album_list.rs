@@ -63,7 +63,7 @@ impl ArtistAlbumList {
             return;
         }
         self.selected = match self.selected {
-            Some(selected) => Some((selected + 1).min(self.rows.len())),
+            Some(selected) => Some((selected + 1).min(self.rows.len() - 1)),
             None => Some(0),
         };
     }
