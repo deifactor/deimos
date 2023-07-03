@@ -9,8 +9,7 @@
 use std::{collections::HashMap, fmt::Debug};
 
 use anyhow::Result;
-use itertools::Itertools;
-use ratatui::widgets::ListState;
+
 use sqlx::{Connection, Pool, Sqlite};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 
@@ -24,16 +23,18 @@ use crate::{app::App, artist_album_list::ArtistAlbumList, library};
 pub enum Action {
     NextFocus,
     NextList,
+    ToggleExpansion,
     SetArtists(HashMap<String, Vec<String>>),
     Quit,
 }
 
 impl Action {
-    pub fn dispatch(self, app: &mut App, sender: &UnboundedSender<Command>) -> Result<()> {
+    pub fn dispatch(self, app: &mut App, _sender: &UnboundedSender<Command>) -> Result<()> {
         use Action::*;
         match self {
             NextList => app.artist_album_list.next(),
             SetArtists(artists) => app.artist_album_list = ArtistAlbumList::new(artists),
+            ToggleExpansion => app.artist_album_list.toggle(),
             NextFocus => (),
             Quit => panic!("bye"),
         }

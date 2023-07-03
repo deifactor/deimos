@@ -1,22 +1,13 @@
-use std::collections::HashMap;
-
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
-use ratatui::{
-    backend::Backend,
-    border,
-    layout::{Constraint, Direction, Layout},
-    style::{Color, Style},
-    widgets::{Block, Borders, List, ListItem, ListState},
-    Frame, Terminal,
-};
-use sqlx::{pool::PoolConnection, Pool, Sqlite};
+use ratatui::{backend::Backend, Frame, Terminal};
+use sqlx::{Pool, Sqlite};
 use tokio::{pin, sync::mpsc::unbounded_channel};
 use tokio_stream::{Stream, StreamExt};
 
 use crate::{
     action::{Action, Command},
-    artist_album_list::{ArtistAlbumList, ArtistAlbumListState},
+    artist_album_list::ArtistAlbumList,
 };
 
 #[derive(Debug)]
@@ -66,6 +57,7 @@ impl App {
             KeyCode::Tab => NextFocus,
             KeyCode::Esc | KeyCode::Char('q') => Quit,
             KeyCode::Down => NextList,
+            KeyCode::Char(' ') => ToggleExpansion,
             _ => return None,
         };
         Some(action)
