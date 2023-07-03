@@ -83,24 +83,21 @@ impl ArtistAlbumList {
     }
 
     fn recompute_rows(&mut self) {
-        self.rows = self
-            .artists
-            .iter()
-            .enumerate()
-            .flat_map(|(artist_index, item)| {
-                let mut rows = vec![RowIndex {
-                    artist: artist_index,
-                    album: None,
-                }];
-                if self.expanded.contains(&artist_index) {
-                    rows.extend((0..item.albums.len()).map(|album_idx| RowIndex {
-                        artist: artist_index,
+        self.rows.clear();
+        for (artist_idx, item) in self.artists.iter().enumerate() {
+            self.rows.push(RowIndex {
+                artist: artist_idx,
+                album: None,
+            });
+            if self.expanded.contains(&artist_idx) {
+                for album_idx in 0..item.albums.len() {
+                    self.rows.push(RowIndex {
+                        artist: artist_idx,
                         album: Some(album_idx),
-                    }));
+                    });
                 }
-                rows.into_iter()
-            })
-            .collect();
+            }
+        }
     }
 }
 
