@@ -9,6 +9,7 @@ use ratatui::{
 #[derive(Debug, PartialEq, Eq)]
 pub struct Track {
     pub song_id: i64,
+    pub number: Option<i64>,
     pub title: Option<String>,
 }
 

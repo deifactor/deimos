@@ -52,6 +52,7 @@ async fn insert_song(
     let mut title: Option<String> = None;
     let mut album: Option<String> = None;
     let mut artist: Option<String> = None;
+    let mut number: Option<i64> = None;
     for tag in metadata
         .current()
         .ok_or(anyhow!("no metadata found"))?
@@ -62,6 +63,8 @@ async fn insert_song(
             (Some(TrackTitle), Value::String(s)) => title = Some(s.clone()),
             (Some(Album), Value::String(s)) => album = Some(s.clone()),
             (Some(AlbumArtist), Value::String(s)) => artist = Some(s.clone()),
+            (Some(TrackNumber), Value::UnsignedInt(i)) => number = Some(*i as i64),
+            (Some(TrackNumber), Value::SignedInt(i)) => number = Some(*i),
             (Some(Artist), Value::String(s)) => {
                 if artist.is_none() {
                     artist = Some(s.clone())
@@ -73,8 +76,9 @@ async fn insert_song(
 
     let path_bytes = path.as_os_str().as_bytes();
     sqlx::query!(
-        "INSERT INTO songs (path, title, album, artist) VALUES (?, ?, ?, ?)",
+        "INSERT INTO songs (path, number, title, album, artist) VALUES (?, ?, ?, ?, ?)",
         path_bytes,
+        number,
         title,
         album,
         artist

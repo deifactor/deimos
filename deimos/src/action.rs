@@ -104,8 +104,9 @@ impl Command {
                 let mut conn = pool.acquire().await?;
                 let tracks = sqlx::query_as!(
                     Track,
-                    r#"SELECT song_id, title
-                       FROM songs WHERE artist = ? AND album = ?"#,
+                    r#"SELECT song_id, number, title
+                       FROM songs WHERE artist = ? AND album = ?
+                       ORDER BY number ASC NULLS FIRST"#,
                     artist,
                     album
                 )
