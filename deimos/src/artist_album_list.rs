@@ -58,6 +58,18 @@ impl ArtistAlbumList {
         list
     }
 
+    pub fn artist(&self) -> Option<String> {
+        let idx = self.selected?;
+        Some(self.artists[self.rows[idx].artist].artist.clone())
+    }
+
+    pub fn album(&self) -> Option<String> {
+        let idx = self.selected?;
+        let artist = self.rows[idx].artist;
+        let album = self.rows[idx].album?;
+        Some(self.artists[artist].albums[album].clone())
+    }
+
     /// Move to the next selection.
     pub fn next(&mut self) {
         if self.artists.is_empty() {

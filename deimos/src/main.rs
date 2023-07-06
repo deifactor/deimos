@@ -3,6 +3,7 @@ mod app;
 mod artist_album_list;
 mod library;
 mod player;
+mod track_list;
 
 use std::{io, panic};
 

@@ -1,6 +1,10 @@
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
-use ratatui::{backend::Backend, Frame, Terminal};
+use ratatui::{
+    backend::Backend,
+    layout::{Constraint, Direction, Layout},
+    Frame, Terminal,
+};
 use sqlx::{Pool, Sqlite};
 use tokio::{pin, sync::mpsc::unbounded_channel};
 use tokio_stream::{Stream, StreamExt};
@@ -8,17 +12,20 @@ use tokio_stream::{Stream, StreamExt};
 use crate::{
     action::{Action, Command},
     artist_album_list::ArtistAlbumList,
+    track_list::TrackList,
 };
 
 #[derive(Debug)]
 pub struct App {
     pub artist_album_list: ArtistAlbumList,
+    pub track_list: TrackList,
 }
 
 impl App {
     pub fn new() -> Self {
         App {
             artist_album_list: ArtistAlbumList::default(),
+            track_list: TrackList::default(),
         }
     }
 
@@ -52,7 +59,12 @@ impl App {
     }
 
     pub fn draw<B: Backend>(&mut self, f: &mut Frame<'_, B>) {
-        self.artist_album_list.draw(f, f.size());
+        let chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+            .split(f.size());
+        self.artist_album_list.draw(f, chunks[0]);
+        self.track_list.draw(f, chunks[1]);
     }
 
     fn terminal_to_action(&self, ev: Event) -> Option<Action> {

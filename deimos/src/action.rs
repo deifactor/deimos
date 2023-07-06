@@ -13,7 +13,12 @@ use anyhow::Result;
 use sqlx::{Connection, Pool, Sqlite};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 
-use crate::{app::App, artist_album_list::ArtistAlbumList, library};
+use crate::{
+    app::App,
+    artist_album_list::ArtistAlbumList,
+    library,
+    track_list::{Track, TrackList},
+};
 
 /// An [`Action`] corresponds to a mutation of the application state. Actions
 /// are semantic. For example, 'the user pressed the n key' is not a good
@@ -25,15 +30,26 @@ pub enum Action {
     NextList,
     ToggleExpansion,
     SetArtists(HashMap<String, Vec<String>>),
+    SetTracks(Vec<Track>),
     Quit,
 }
 
 impl Action {
-    pub fn dispatch(self, app: &mut App, _sender: &UnboundedSender<Command>) -> Result<()> {
+    pub fn dispatch(self, app: &mut App, sender: &UnboundedSender<Command>) -> Result<()> {
         use Action::*;
         match self {
-            NextList => app.artist_album_list.next(),
+            NextList => {
+                app.artist_album_list.next();
+                let artist = app.artist_album_list.artist();
+                let album = app.artist_album_list.album();
+                if let (Some(artist), Some(album)) = (artist, album) {
+                    sender.send(Command::LoadTracks { artist, album })?;
+                } else {
+                    SetTracks(vec![]).dispatch(app, sender)?;
+                }
+            }
             SetArtists(artists) => app.artist_album_list = ArtistAlbumList::new(artists),
+            SetTracks(tracks) => app.track_list = TrackList::new(tracks),
             ToggleExpansion => app.artist_album_list.toggle(),
             NextFocus => (),
             Quit => panic!("bye"),
@@ -48,6 +64,7 @@ impl Action {
 #[derive(Debug)]
 pub enum Command {
     LoadLibrary,
+    LoadTracks { artist: String, album: String },
 }
 
 impl Command {
@@ -81,6 +98,20 @@ impl Command {
                 .into_iter()
                 .for_each(|row| artists.entry(row.artist).or_default().push(row.album));
                 Some(Action::SetArtists(artists))
+            }
+
+            LoadTracks { artist, album } => {
+                let mut conn = pool.acquire().await?;
+                let tracks = sqlx::query_as!(
+                    Track,
+                    r#"SELECT song_id, title
+                       FROM songs WHERE artist = ? AND album = ?"#,
+                    artist,
+                    album
+                )
+                .fetch_all(&mut conn)
+                .await?;
+                Some(Action::SetTracks(tracks))
             }
         };
         Ok(action)
