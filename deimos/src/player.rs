@@ -1,5 +1,8 @@
 use anyhow::Result;
-use std::sync::{Arc, Mutex};
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use rodio::{cpal::FromSample, OutputStreamHandle, Sample, Sink, Source};
 
@@ -7,12 +10,14 @@ use rodio::{cpal::FromSample, OutputStreamHandle, Sample, Sink, Source};
 #[derive(Clone)]
 pub struct Player {
     sink: Arc<Mutex<Sink>>,
+    elapsed: Arc<Mutex<Duration>>,
 }
 
 impl Player {
     pub fn new(handle: OutputStreamHandle) -> Result<Self> {
         let sink = Arc::new(Mutex::new(Sink::try_new(&handle)?));
-        Ok(Self { sink })
+        let elapsed = Arc::new(Mutex::new(Duration::ZERO));
+        Ok(Self { sink, elapsed })
     }
 
     pub fn pause(&self) {
