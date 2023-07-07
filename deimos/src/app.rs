@@ -1,7 +1,6 @@
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::{
-    backend::Backend,
     layout::{Constraint, Direction, Layout},
     Frame, Terminal,
 };
@@ -13,27 +12,22 @@ use crate::{
     action::{Action, Command},
     artist_album_list::ArtistAlbumList,
     track_list::TrackList,
+    ui::{Component, DeimosBackend, Ui},
 };
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct App {
     pub artist_album_list: ArtistAlbumList,
     pub track_list: TrackList,
+    pub ui: Ui,
 }
 
 impl App {
-    pub fn new() -> Self {
-        App {
-            artist_album_list: ArtistAlbumList::default(),
-            track_list: TrackList::default(),
-        }
-    }
-
-    pub async fn run<B: Backend>(
+    pub async fn run(
         mut self,
         pool: Pool<Sqlite>,
         terminal_events: impl Stream<Item = Event> + Send + Sync + 'static,
-        mut terminal: Terminal<B>,
+        mut terminal: Terminal<DeimosBackend>,
     ) -> Result<()> {
         let (tx_action, mut rx_action) = unbounded_channel::<Action>();
         let sender = Command::spawn_executor(pool.clone(), tx_action.clone());
@@ -54,17 +48,18 @@ impl App {
                     }
                 }
             }
-            terminal.draw(|f| self.draw(f))?;
+            terminal.draw(|f| self.draw(f).expect("failed to rerender app"))?;
         }
     }
 
-    pub fn draw<B: Backend>(&mut self, f: &mut Frame<'_, B>) {
+    pub fn draw(&mut self, f: &mut Frame<'_, DeimosBackend>) -> Result<()> {
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
             .split(f.size());
-        self.artist_album_list.draw(f, chunks[0]);
-        self.track_list.draw(f, chunks[1]);
+        self.artist_album_list.draw(&self.ui, f, chunks[0])?;
+        self.track_list.draw(&self.ui, f, chunks[1])?;
+        Ok(())
     }
 
     fn terminal_to_action(&self, ev: Event) -> Option<Action> {

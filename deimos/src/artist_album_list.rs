@@ -1,5 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
+use anyhow::Result;
 use itertools::Itertools;
 use ratatui::{
     backend::Backend,
@@ -8,6 +9,8 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
+
+use crate::ui::{Component, DeimosBackend, FocusTarget, Ui};
 
 #[derive(Debug)]
 struct ArtistItem {
@@ -122,16 +125,29 @@ impl ArtistAlbumList {
 
 /// Drawing code
 impl ArtistAlbumList {
-    pub fn draw<B: Backend>(&mut self, frame: &mut Frame<B>, area: Rect) {
+    /// Text to use when drawing the given row.
+    fn text(&self, row: RowIndex) -> String {
+        let artist = &self.artists[row.artist];
+        match row.album {
+            Some(album) => format!("    {}", artist.albums[album]),
+            None => artist.artist.clone(),
+        }
+    }
+}
+
+impl Component for ArtistAlbumList {
+    fn draw(&mut self, ui: &Ui, frame: &mut Frame<DeimosBackend>, area: Rect) -> Result<()> {
         let block = Block::default()
             .title("Artist / Album")
-            .borders(Borders::ALL);
+            .borders(Borders::ALL)
+            .border_style(ui.border(ui.is_focused(FocusTarget::ArtistAlbumList)));
+
         let inner = block.inner(area);
         frame.render_widget(block, area);
 
         if inner.width < 1 || inner.height < 1 || self.artists.is_empty() {
             // nothing to do
-            return;
+            return Ok(());
         }
 
         if let Some(selected) = self.selected {
@@ -161,14 +177,6 @@ impl ArtistAlbumList {
                 Rect::new(inner.left(), inner.top() + y as u16, inner.width, 1),
             );
         }
-    }
-
-    /// Text to use when drawing the given row.
-    fn text(&self, row: RowIndex) -> String {
-        let artist = &self.artists[row.artist];
-        match row.album {
-            Some(album) => format!("    {}", artist.albums[album]),
-            None => artist.artist.clone(),
-        }
+        Ok(())
     }
 }

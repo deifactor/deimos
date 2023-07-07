@@ -45,7 +45,7 @@ impl Action {
             SetArtists(artists) => app.artist_album_list = ArtistAlbumList::new(artists),
             SetTracks(tracks) => app.track_list = TrackList::new(tracks),
             ToggleExpansion => app.artist_album_list.toggle(),
-            NextFocus => (),
+            NextFocus => app.ui.focus = app.ui.focus.next(),
             Quit => panic!("bye"),
         }
         Ok(())

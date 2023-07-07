@@ -1,10 +1,12 @@
+use anyhow::Result;
 use itertools::Itertools;
 use ratatui::{
-    backend::Backend,
     layout::Rect,
     widgets::{Block, Borders, List, ListItem, ListState},
     Frame,
 };
+
+use crate::ui::{Component, DeimosBackend, FocusTarget, Ui};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Track {
@@ -30,9 +32,13 @@ impl TrackList {
 }
 
 /// Drawing code
-impl TrackList {
-    pub fn draw<B: Backend>(&mut self, frame: &mut Frame<B>, area: Rect) {
-        let block = Block::default().title("Tracks").borders(Borders::ALL);
+impl Component for TrackList {
+    fn draw(&mut self, ui: &Ui, frame: &mut Frame<DeimosBackend>, area: Rect) -> Result<()> {
+        let block = Block::default()
+            .title("Tracks")
+            .borders(Borders::ALL)
+            .border_style(ui.border(ui.is_focused(FocusTarget::TrackList)));
+
         let list = List::new(
             self.tracks
                 .iter()
@@ -41,5 +47,6 @@ impl TrackList {
         )
         .block(block);
         frame.render_widget(list, area);
+        Ok(())
     }
 }

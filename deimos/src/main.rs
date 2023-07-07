@@ -4,6 +4,7 @@ mod artist_album_list;
 mod library;
 mod player;
 mod track_list;
+mod ui;
 
 use std::{io, panic};
 
@@ -25,7 +26,7 @@ async fn main() -> Result<()> {
     let terminal = prepare_terminal()?;
     let pool = initialize_db("songs.sqlite").await?;
 
-    let app = App::new();
+    let app = App::default();
 
     app.run(pool, EventStream::new().filter_map(|ev| ev.ok()), terminal)
         .await?;
