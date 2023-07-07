@@ -27,6 +27,7 @@ use crate::{
 #[derive(Debug, PartialEq, Eq)]
 pub enum Action {
     NextFocus,
+    PrevList,
     NextList,
     ToggleExpansion,
     SetArtists(HashMap<String, Vec<String>>),
@@ -38,15 +39,13 @@ impl Action {
     pub fn dispatch(self, app: &mut App, sender: &UnboundedSender<Command>) -> Result<()> {
         use Action::*;
         match self {
+            PrevList => {
+                app.artist_album_list.prev();
+                sync_track_list(app, sender);
+            }
             NextList => {
                 app.artist_album_list.next();
-                let artist = app.artist_album_list.artist();
-                let album = app.artist_album_list.album();
-                if let (Some(artist), Some(album)) = (artist, album) {
-                    sender.send(Command::LoadTracks { artist, album })?;
-                } else {
-                    SetTracks(vec![]).dispatch(app, sender)?;
-                }
+                sync_track_list(app, sender)?;
             }
             SetArtists(artists) => app.artist_album_list = ArtistAlbumList::new(artists),
             SetTracks(tracks) => app.track_list = TrackList::new(tracks),
@@ -134,4 +133,15 @@ impl Command {
         });
         tx_cmd
     }
+}
+
+fn sync_track_list(app: &mut App, sender: &UnboundedSender<Command>) -> Result<(), anyhow::Error> {
+    let artist = app.artist_album_list.artist();
+    let album = app.artist_album_list.album();
+    if let (Some(artist), Some(album)) = (artist, album) {
+        sender.send(Command::LoadTracks { artist, album })?;
+    } else {
+        Action::SetTracks(vec![]).dispatch(app, sender)?;
+    }
+    Ok(())
 }

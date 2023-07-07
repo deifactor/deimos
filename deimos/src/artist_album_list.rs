@@ -70,6 +70,14 @@ impl ArtistAlbumList {
         Some(self.artists[artist].albums[album].clone())
     }
 
+    /// Move to the previous selection.
+    pub fn prev(&mut self) {
+        if self.artists.is_empty() {
+            return;
+        }
+        self.selected = self.selected.map(|selected| selected.saturating_sub(1));
+    }
+
     /// Move to the next selection.
     pub fn next(&mut self) {
         if self.artists.is_empty() {

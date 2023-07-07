@@ -73,6 +73,7 @@ impl App {
         let action = match code {
             KeyCode::Tab => NextFocus,
             KeyCode::Esc | KeyCode::Char('q') => Quit,
+            KeyCode::Up => PrevList,
             KeyCode::Down => NextList,
             KeyCode::Char(' ') => ToggleExpansion,
             _ => return None,
