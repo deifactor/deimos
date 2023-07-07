@@ -58,7 +58,7 @@ async fn insert_song(path: &Path, conn: &mut Transaction<'_, Sqlite>) -> Result<
         album,
         artist
     )
-    .execute(conn)
+    .execute(&mut **conn)
     .await?;
     Ok(())
 }

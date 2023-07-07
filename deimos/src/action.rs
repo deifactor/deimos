@@ -74,7 +74,7 @@ impl Command {
             LoadLibrary => {
                 let mut conn = pool.acquire().await?;
                 let count = sqlx::query!("SELECT COUNT(*) AS count FROM songs")
-                    .fetch_one(&mut conn)
+                    .fetch_one(&mut *conn)
                     .await?
                     .count;
                 // only reinitialize db if there are no songs
@@ -93,7 +93,7 @@ impl Command {
                        FROM songs WHERE artist IS NOT NULL AND album IS NOT NULL
                        ORDER BY artist, album"#
                 )
-                .fetch_all(&mut conn)
+                .fetch_all(&mut *conn)
                 .await?
                 .into_iter()
                 .for_each(|row| artists.entry(row.artist).or_default().push(row.album));
@@ -110,7 +110,7 @@ impl Command {
                     artist,
                     album
                 )
-                .fetch_all(&mut conn)
+                .fetch_all(&mut *conn)
                 .await?;
                 Some(Action::SetTracks(tracks))
             }
