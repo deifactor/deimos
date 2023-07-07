@@ -27,8 +27,7 @@ use crate::{
 #[derive(Debug, PartialEq, Eq)]
 pub enum Action {
     NextFocus,
-    PrevList,
-    NextList,
+    MoveSelection(isize),
     ToggleExpansion,
     SetArtists(HashMap<String, Vec<String>>),
     SetTracks(Vec<Track>),
@@ -39,12 +38,8 @@ impl Action {
     pub fn dispatch(self, app: &mut App, sender: &UnboundedSender<Command>) -> Result<()> {
         use Action::*;
         match self {
-            PrevList => {
-                app.artist_album_list.prev();
-                sync_track_list(app, sender);
-            }
-            NextList => {
-                app.artist_album_list.next();
+            MoveSelection(amount) => {
+                app.artist_album_list.move_selection(amount);
                 sync_track_list(app, sender)?;
             }
             SetArtists(artists) => app.artist_album_list = ArtistAlbumList::new(artists),

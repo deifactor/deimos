@@ -71,22 +71,19 @@ impl ArtistAlbumList {
     }
 
     /// Move to the previous selection.
-    pub fn prev(&mut self) {
-        if self.artists.is_empty() {
-            return;
-        }
-        self.selected = self.selected.map(|selected| selected.saturating_sub(1));
-    }
-
-    /// Move to the next selection.
-    pub fn next(&mut self) {
+    pub fn move_selection(&mut self, amount: isize) {
         if self.artists.is_empty() {
             return;
         }
         self.selected = match self.selected {
-            Some(selected) => Some((selected + 1).min(self.rows.len() - 1)),
-            None => Some(0),
-        };
+            Some(selected) => Some(
+                selected
+                    .saturating_add_signed(amount)
+                    .min(self.rows.len() - 1),
+            ),
+            None if amount > 0 => Some(0),
+            None => None,
+        }
     }
 
     /// Toggles whether the currently selected artist is expanded. Adjusts the selection as necessary.
