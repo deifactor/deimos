@@ -18,6 +18,7 @@ use crate::{
     artist_album_list::ArtistAlbumList,
     library,
     track_list::{Track, TrackList},
+    ui::FocusTarget,
 };
 
 /// An [`Action`] corresponds to a mutation of the application state. Actions
@@ -38,10 +39,15 @@ impl Action {
     pub fn dispatch(self, app: &mut App, sender: &UnboundedSender<Command>) -> Result<()> {
         use Action::*;
         match self {
-            MoveSelection(amount) => {
-                app.artist_album_list.move_selection(amount);
-                sync_track_list(app, sender)?;
-            }
+            MoveSelection(amount) => match app.ui.focus {
+                FocusTarget::ArtistAlbumList => {
+                    app.artist_album_list.move_selection(amount);
+                    sync_track_list(app, sender)?;
+                }
+                FocusTarget::TrackList => {
+                    app.track_list.move_selection(amount);
+                }
+            },
             SetArtists(artists) => app.artist_album_list = ArtistAlbumList::new(artists),
             SetTracks(tracks) => app.track_list = TrackList::new(tracks),
             ToggleExpansion => app.artist_album_list.toggle(),
