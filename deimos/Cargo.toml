@@ -16,6 +16,7 @@ ratatui = { version = "0.21.0", features = ["macros"] }
 rodio = { version = "0.17.1", default-features = false, features = ["symphonia-all"] }
 sqlx = { version = "0.7", features = ["sqlite", "runtime-tokio"] }
 symphonia = { version = "0.5.3", features = ["all"] }
+tap = "1.0.1"
 tokio = { version = "1.28.2", features = ["full"] }
 tokio-stream = "0.1.14"
 walkdir = "2.3.3"

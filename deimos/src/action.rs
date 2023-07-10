@@ -6,17 +6,22 @@
 /// - We don't have to box them all the time (performance doesn't matter, but it's verbose)
 /// - We can make their methods take them by move (can't call a by-move method on a boxed trait object)
 /// - Less verbose to declare a new action
-use std::{collections::HashMap, fmt::Debug};
+use std::{collections::HashMap, fmt::Debug, fs::File, io::BufReader, path::PathBuf};
 
 use anyhow::Result;
 
+use rodio::Source;
 use sqlx::{Connection, Pool, Sqlite};
+use tap::Pipe;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 
 use crate::{
     app::App,
     artist_album_list::ArtistAlbumList,
+    decoder::TrackingSymphoniaDecoder,
     library,
+    now_playing::PlayState,
+    player::Player,
     track_list::{Track, TrackList},
     ui::FocusTarget,
 };
@@ -32,6 +37,8 @@ pub enum Action {
     ToggleExpansion,
     SetArtists(HashMap<String, Vec<String>>),
     SetTracks(Vec<Track>),
+    PlaySelectedTrack,
+    SetNowPlaying(Option<PlayState>),
     Quit,
 }
 
@@ -50,6 +57,12 @@ impl Action {
             },
             SetArtists(artists) => app.artist_album_list = ArtistAlbumList::new(artists),
             SetTracks(tracks) => app.track_list = TrackList::new(tracks),
+            PlaySelectedTrack => {
+                if let Some(selected) = app.track_list.selected() {
+                    sender.send(Command::PlayTrack(selected.song_id))?;
+                }
+            }
+            SetNowPlaying(play_state) => app.now_playing.play_state = play_state,
             ToggleExpansion => app.artist_album_list.toggle(),
             NextFocus => app.ui.focus = app.ui.focus.next(),
             Quit => panic!("bye"),
@@ -65,10 +78,11 @@ impl Action {
 pub enum Command {
     LoadLibrary,
     LoadTracks { artist: String, album: String },
+    PlayTrack(i64),
 }
 
 impl Command {
-    async fn execute(self, pool: &Pool<Sqlite>) -> Result<Option<Action>> {
+    async fn execute(self, pool: &Pool<Sqlite>, player: &Player) -> Result<Option<Action>> {
         use Command::*;
         let action = match self {
             LoadLibrary => {
@@ -114,6 +128,21 @@ impl Command {
                 .await?;
                 Some(Action::SetTracks(tracks))
             }
+
+            PlayTrack(song_id) => {
+                let mut conn = pool.acquire().await?;
+                let path = sqlx::query_scalar!(
+                    "SELECT CAST(path AS TEXT) FROM songs WHERE song_id = ?",
+                    song_id
+                )
+                .fetch_one(&mut *conn)
+                .await?
+                .pipe(PathBuf::from);
+                let decoder = TrackingSymphoniaDecoder::from_path(path)?;
+                player.append(decoder);
+                player.play();
+                None
+            }
         };
         Ok(action)
     }
@@ -121,13 +150,14 @@ impl Command {
     /// Spawns an executor task that will forever execute any commands sent via the returned command sender.
     pub fn spawn_executor(
         pool: Pool<Sqlite>,
+        player: Player,
         send_action: UnboundedSender<Action>,
     ) -> UnboundedSender<Command> {
         let (tx_cmd, mut rx_cmd) = unbounded_channel::<Command>();
         tokio::spawn(async move {
             while let Some(command) = rx_cmd.recv().await {
-                if let Some(action) = command.execute(&pool).await? {
-                    send_action.send(action)?;
+                if let Some(action) = command.execute(&pool, &player).await.unwrap() {
+                    send_action.send(action).unwrap();
                 }
             }
             anyhow::Ok(())

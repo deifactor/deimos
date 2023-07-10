@@ -12,6 +12,7 @@ use crate::{
     action::{Action, Command},
     artist_album_list::ArtistAlbumList,
     now_playing::NowPlaying,
+    player::Player,
     track_list::TrackList,
     ui::{Component, DeimosBackend, Ui},
 };
@@ -28,11 +29,12 @@ impl App {
     pub async fn run(
         mut self,
         pool: Pool<Sqlite>,
+        player: Player,
         terminal_events: impl Stream<Item = Event> + Send + Sync + 'static,
         mut terminal: Terminal<DeimosBackend>,
     ) -> Result<()> {
         let (tx_action, mut rx_action) = unbounded_channel::<Action>();
-        let sender = Command::spawn_executor(pool.clone(), tx_action.clone());
+        let sender = Command::spawn_executor(pool.clone(), player, tx_action.clone());
         sender.send(Command::LoadLibrary)?;
         pin!(terminal_events);
 
@@ -78,6 +80,7 @@ impl App {
             KeyCode::Up => MoveSelection(-1),
             KeyCode::Down => MoveSelection(1),
             KeyCode::Char(' ') => ToggleExpansion,
+            KeyCode::Enter => PlaySelectedTrack,
             _ => return None,
         };
         Some(action)

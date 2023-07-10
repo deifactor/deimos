@@ -45,6 +45,10 @@ impl TrackList {
             None => None,
         });
     }
+
+    pub fn selected(&self) -> Option<&Track> {
+        self.state.selected().map(|i| &self.tracks[i])
+    }
 }
 
 /// Drawing code

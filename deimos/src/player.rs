@@ -20,6 +20,10 @@ impl Player {
         Ok(Self { sink, elapsed })
     }
 
+    pub fn clear(&self) {
+        self.sink.lock().unwrap().clear()
+    }
+
     pub fn pause(&self) {
         self.sink.lock().unwrap().pause()
     }

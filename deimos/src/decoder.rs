@@ -29,7 +29,7 @@ pub struct TrackingSymphoniaDecoder {
     format: Box<dyn FormatReader>,
     buffer: SampleBuffer<i16>,
     spec: SignalSpec,
-    callback: Option<Box<dyn FnMut(Duration)>>,
+    callback: Option<Box<dyn FnMut(Duration) + Send + 'static>>,
 }
 
 impl TrackingSymphoniaDecoder {
@@ -85,7 +85,7 @@ impl TrackingSymphoniaDecoder {
     }
 
     /// Set the callback to invoke when updating the timestamp.
-    pub fn with_callback(self, callback: impl FnMut(Duration) + 'static) -> Self {
+    pub fn with_callback(self, callback: impl FnMut(Duration) + Send + 'static) -> Self {
         Self {
             callback: Some(Box::new(callback)),
             ..self
