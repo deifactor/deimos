@@ -4,7 +4,6 @@ use rodio::Source;
 use std::{
     fs::File,
     path::Path,
-    sync::{Arc, Mutex},
     time::Duration,
 };
 use symphonia::{
@@ -25,19 +24,17 @@ use symphonia::{
 // But a decode error in more than 3 consecutive packets is fatal.
 const MAX_DECODE_ERRORS: usize = 3;
 
-/// Like rodio's built-in `SymphoniaDecoder`, but also updates a field with the elapsed time after yielding each packet.
+/// Like rodio's built-in `SymphoniaDecoder`, but also invokes the callback to
+/// keep the caller updated with the timestamp.
 pub struct TrackingSymphoniaDecoder {
     decoder: Box<dyn Decoder>,
     current_frame_offset: usize,
     format: Box<dyn FormatReader>,
     buffer: SampleBuffer<i16>,
     spec: SignalSpec,
-    timestamp: Arc<Mutex<Duration>>,
+    callback: Option<Box<dyn FnMut(Duration)>>,
 }
 
-/// Decodes a media source using symphonia and exposes the current
-/// timestamp. The timestamp is not guaranteed to be accurate, but will be
-/// fairly close.
 impl TrackingSymphoniaDecoder {
     fn new(mss: MediaSourceStream, extension: Option<&str>) -> Result<Self> {
         let mut hint = Hint::new();
@@ -86,18 +83,22 @@ impl TrackingSymphoniaDecoder {
             format: probed.format,
             buffer,
             spec,
-            timestamp: Arc::new(Mutex::new(Duration::ZERO)),
+            callback: None,
         })
+    }
+
+    /// Set the callback to invoke when updating the timestamp.
+    pub fn with_callback(self, callback: impl FnMut(Duration) + 'static) -> Self {
+        Self {
+            callback: Some(Box::new(callback)),
+            ..self
+        }
     }
 
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
         let file = File::open(path.as_ref())?;
         let mss = MediaSourceStream::new(Box::new(file), Default::default());
         Self::new(mss, path.as_ref().extension().and_then(|ext| ext.to_str()))
-    }
-
-    pub fn timestamp(&self) -> Arc<Mutex<Duration>> {
-        Arc::clone(&self.timestamp)
     }
 
     #[inline]
@@ -144,8 +145,11 @@ impl Iterator for TrackingSymphoniaDecoder {
                 // We only update the elapsed time when we get a new packet to
                 // avoid *constantly* updating it.
                 let timestamp = time_base.calc_time(packet.ts + packet.dur);
-                *self.timestamp.lock().unwrap() =
-                    Duration::from_secs_f64(timestamp.seconds as f64 + timestamp.frac);
+                if let Some(callback) = &mut self.callback {
+                    callback(Duration::from_secs_f64(
+                        timestamp.seconds as f64 + timestamp.frac,
+                    ));
+                }
                 match self.decoder.decode(&packet) {
                     Ok(decoded) => break decoded,
                     Err(e) => match e {
@@ -175,21 +179,22 @@ impl Iterator for TrackingSymphoniaDecoder {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
+    use std::{io::Cursor, sync::mpsc::channel};
 
     use super::*;
 
     #[test]
     fn test_timestamp() -> Result<()> {
+        let (tx, rx) = channel::<Duration>();
         let mss = MediaSourceStream::new(
             Box::new(Cursor::new(include_bytes!("../test_data/3_seconds.mp3"))),
             Default::default(),
         );
-        let decoder = TrackingSymphoniaDecoder::new(mss, Some("mp3"))?;
-        let timestamp = decoder.timestamp();
+        let decoder = TrackingSymphoniaDecoder::new(mss, Some("mp3"))?
+            .with_callback(move |dur| tx.send(dur).unwrap());
         // drain the iterator to go all the way to the end
         for _ in decoder.into_iter() {}
-        assert_eq!(*timestamp.lock().unwrap(), Duration::from_secs(3));
+        assert_eq!(rx.into_iter().last(), Some(Duration::from_secs(3)));
         Ok(())
     }
 }
