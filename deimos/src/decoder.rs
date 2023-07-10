@@ -1,11 +1,8 @@
 // This file heavily based on `rodio/src/decoder/symphonia.rs`.
+
 use anyhow::{bail, Result};
 use rodio::Source;
-use std::{
-    fs::File,
-    path::Path,
-    time::Duration,
-};
+use std::{fs::File, path::Path, time::Duration};
 use symphonia::{
     core::{
         audio::{AudioBufferRef, SampleBuffer, SignalSpec},

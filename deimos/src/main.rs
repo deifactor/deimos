@@ -6,6 +6,7 @@ mod library;
 mod player;
 mod track_list;
 mod ui;
+mod now_playing;
 
 use std::{io, panic};
 

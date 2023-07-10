@@ -11,6 +11,7 @@ use tokio_stream::{Stream, StreamExt};
 use crate::{
     action::{Action, Command},
     artist_album_list::ArtistAlbumList,
+    now_playing::NowPlaying,
     track_list::TrackList,
     ui::{Component, DeimosBackend, Ui},
 };
@@ -19,6 +20,7 @@ use crate::{
 pub struct App {
     pub artist_album_list: ArtistAlbumList,
     pub track_list: TrackList,
+    pub now_playing: NowPlaying,
     pub ui: Ui,
 }
 
@@ -53,12 +55,17 @@ impl App {
     }
 
     pub fn draw(&mut self, f: &mut Frame<'_, DeimosBackend>) -> Result<()> {
-        let chunks = Layout::default()
+        let root = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(10), Constraint::Max(7)])
+            .split(f.size());
+        let top = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
-            .split(f.size());
-        self.artist_album_list.draw(&self.ui, f, chunks[0])?;
-        self.track_list.draw(&self.ui, f, chunks[1])?;
+            .split(root[0]);
+        self.artist_album_list.draw(&self.ui, f, top[0])?;
+        self.track_list.draw(&self.ui, f, top[1])?;
+        self.now_playing.draw(&self.ui, f, root[1])?;
         Ok(())
     }
 
