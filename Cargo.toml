@@ -3,10 +3,13 @@ members = [
     "deimos",
     "mimi",
 ]
+resolver = "2"
 
 # Build our dependencies optimized, but ourselves in dev mode. This is
 # important because we're using audio libraries.
 [profile.dev.package."*"]
 opt-level = 3
+[profile.dev.package.deimos]
+opt-level = 0
 [profile.dev]
-opt-level = 1
+lto = false
