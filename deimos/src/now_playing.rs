@@ -3,11 +3,10 @@ use std::time::Duration;
 use ordered_float::OrderedFloat;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout},
-    style::{Color, Style},
-    widgets::{Block, Borders, Gauge, Paragraph, Widget},
+    widgets::Paragraph,
 };
 
-use crate::ui::{Component, FocusTarget};
+use crate::ui::Component;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Track {
