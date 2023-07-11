@@ -4,5 +4,6 @@ CREATE TABLE songs (
   number INTEGER,
   title TEXT,
   album TEXT,
-  artist TEXT
+  artist TEXT,
+  length REAL NOT NULL
 );

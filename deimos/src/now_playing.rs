@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use ordered_float::OrderedFloat;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Style},
@@ -16,6 +17,7 @@ pub struct Track {
     pub title: Option<String>,
     pub album: Option<String>,
     pub artist: Option<String>,
+    pub length: OrderedFloat<f64>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -54,7 +56,15 @@ impl Component for NowPlaying {
         );
         let mins = play_state.timestamp.as_secs() / 60;
         let secs = play_state.timestamp.as_secs() % 60;
-        frame.render_widget(Paragraph::new(format!("{mins:0>2}:{secs:0>2}")), chunks[1]);
+
+        let total_mins = (play_state.track.length / 60.0).floor() as u64;
+        let total_secs = (play_state.track.length % 60.0).ceil() as u64;
+        frame.render_widget(
+            Paragraph::new(format!(
+                "{mins:0>2}:{secs:0>2} / {total_mins:0>2}:{total_secs:0>2}"
+            )),
+            chunks[1],
+        );
 
         Ok(())
     }

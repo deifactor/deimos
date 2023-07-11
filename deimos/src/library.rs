@@ -1,8 +1,8 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use lofty::{Accessor, TaggedFileExt};
 use sqlx::{sqlite::SqliteConnectOptions, Pool, Sqlite, SqlitePool, Transaction};
-use std::{fs::File, os::unix::prelude::OsStrExt, path::Path};
-use symphonia::core::io::MediaSourceStream;
+use std::{fs::File, os::unix::prelude::OsStrExt, path::Path, time::Duration};
+use symphonia::core::{formats::Track, io::MediaSourceStream};
 
 use walkdir::WalkDir;
 
@@ -34,15 +34,21 @@ pub async fn find_music(path: impl AsRef<Path>, conn: &mut Transaction<'_, Sqlit
             &Default::default(),
             &Default::default(),
         );
-        if probed.is_err() {
-            continue;
-        }
-        let _ = insert_song(entry.path(), conn).await;
+        let Ok(probed) = probed else { continue; };
+        let stream = match probed.format.default_track() {
+            Some(stream) => stream,
+            None => bail!("couldn't find a default track"),
+        };
+        let _ = insert_song(entry.path(), stream, conn).await;
     }
     Ok(())
 }
 
-async fn insert_song(path: &Path, conn: &mut Transaction<'_, Sqlite>) -> Result<()> {
+async fn insert_song(
+    path: &Path,
+    stream: &Track,
+    conn: &mut Transaction<'_, Sqlite>,
+) -> Result<()> {
     let tagged_file = lofty::read_from_path(path)?;
     let tag = tagged_file.primary_tag().context("no tags found")?.clone();
     let path_bytes = path.as_os_str().as_bytes();
@@ -50,13 +56,17 @@ async fn insert_song(path: &Path, conn: &mut Transaction<'_, Sqlite>) -> Result<
     let title = tag.title();
     let album = tag.album();
     let artist = tag.artist();
+    let time_base = stream.codec_params.time_base.unwrap();
+    let duration = time_base.calc_time(stream.codec_params.n_frames.unwrap());
+    let duration = duration.seconds as f64 + duration.frac;
     sqlx::query!(
-        "INSERT INTO songs (path, number, title, album, artist) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO songs (path, number, title, album, artist, length) VALUES (?, ?, ?, ?, ?, ?)",
         path_bytes,
         track,
         title,
         album,
-        artist
+        artist,
+        duration
     )
     .execute(&mut **conn)
     .await?;
