@@ -82,7 +82,12 @@ pub enum Command {
 }
 
 impl Command {
-    async fn execute(self, pool: &Pool<Sqlite>, player: &Player) -> Result<Option<Action>> {
+    async fn execute(
+        self,
+        pool: &Pool<Sqlite>,
+        player: &Player,
+        tx_action: &UnboundedSender<Action>,
+    ) -> Result<Option<Action>> {
         use Command::*;
         let action = match self {
             LoadLibrary => {
@@ -131,14 +136,25 @@ impl Command {
 
             PlayTrack(song_id) => {
                 let mut conn = pool.acquire().await?;
-                let path = sqlx::query_scalar!(
-                    "SELECT CAST(path AS TEXT) FROM songs WHERE song_id = ?",
+                let track = sqlx::query_as!(
+                    crate::now_playing::Track,
+                    "SELECT * FROM songs WHERE song_id = ?",
                     song_id
                 )
                 .fetch_one(&mut *conn)
-                .await?
-                .pipe(PathBuf::from);
-                let decoder = TrackingSymphoniaDecoder::from_path(path)?;
+                .await?;
+                let tx_action = tx_action.clone();
+                let decoder = TrackingSymphoniaDecoder::from_path(&track.path)?.with_callback(
+                    move |timestamp| {
+                        tx_action
+                            .send(Action::SetNowPlaying(Some(PlayState {
+                                timestamp,
+                                track: track.clone(),
+                            })))
+                            .unwrap();
+                    },
+                );
+                player.stop();
                 player.append(decoder);
                 player.play();
                 None
@@ -156,7 +172,7 @@ impl Command {
         let (tx_cmd, mut rx_cmd) = unbounded_channel::<Command>();
         tokio::spawn(async move {
             while let Some(command) = rx_cmd.recv().await {
-                if let Some(action) = command.execute(&pool, &player).await.unwrap() {
+                if let Some(action) = command.execute(&pool, &player, &send_action).await.unwrap() {
                     send_action.send(action).unwrap();
                 }
             }

@@ -1,12 +1,18 @@
 use std::time::Duration;
 
-use ratatui::widgets::{Block, Borders};
+use ratatui::{
+    layout::{Alignment, Constraint, Direction, Layout},
+    style::{Color, Style},
+    widgets::{Block, Borders, Gauge, Paragraph, Widget},
+};
 
 use crate::ui::{Component, FocusTarget};
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Track {
-    pub number: i32,
+    pub song_id: i64,
+    pub number: Option<i64>,
+    pub path: String,
     pub title: Option<String>,
     pub album: Option<String>,
     pub artist: Option<String>,
@@ -27,26 +33,28 @@ pub struct NowPlaying {
 impl Component for NowPlaying {
     fn draw(
         &mut self,
-        ui: &crate::ui::Ui,
+        _ui: &crate::ui::Ui,
         frame: &mut ratatui::Frame<crate::ui::DeimosBackend>,
         area: ratatui::layout::Rect,
     ) -> anyhow::Result<()> {
-        let block = Block::default()
-            .title("Now Playing")
-            .borders(Borders::ALL)
-            // can't ever receive
-            .border_style(ui.border(false));
-
-        let inner = block.inner(area);
-        frame.render_widget(block, area);
-
-        if inner.width < 3 || inner.height < 1 {
-            return Ok(());
-        }
-
         let Some(play_state) = &self.play_state else {
             return Ok(());
         };
+
+        let title = play_state.track.title.as_deref().unwrap_or("<unknown>");
+        let artist = play_state.track.artist.as_deref().unwrap_or("<unknown>");
+
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(1), Constraint::Length(1)])
+            .split(area);
+        frame.render_widget(
+            Paragraph::new(format!("{title} - {artist}")).alignment(Alignment::Center),
+            chunks[0],
+        );
+        let mins = play_state.timestamp.as_secs() / 60;
+        let secs = play_state.timestamp.as_secs() % 60;
+        frame.render_widget(Paragraph::new(format!("{mins:0>2}:{secs:0>2}")), chunks[1]);
 
         Ok(())
     }

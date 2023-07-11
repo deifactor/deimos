@@ -59,7 +59,7 @@ impl App {
     pub fn draw(&mut self, f: &mut Frame<'_, DeimosBackend>) -> Result<()> {
         let root = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Min(10), Constraint::Max(7)])
+            .constraints([Constraint::Min(10), Constraint::Max(2)])
             .split(f.size());
         let top = Layout::default()
             .direction(Direction::Horizontal)

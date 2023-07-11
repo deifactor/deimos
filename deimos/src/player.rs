@@ -28,6 +28,10 @@ impl Player {
         self.sink.lock().unwrap().pause()
     }
 
+    pub fn stop(&self) {
+        self.sink.lock().unwrap().stop()
+    }
+
     pub fn play(&self) {
         self.sink.lock().unwrap().play()
     }
