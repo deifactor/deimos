@@ -10,14 +10,12 @@ use rodio::{cpal::FromSample, OutputStreamHandle, Sample, Sink, Source};
 #[derive(Clone)]
 pub struct Player {
     sink: Arc<Mutex<Sink>>,
-    elapsed: Arc<Mutex<Duration>>,
 }
 
 impl Player {
     pub fn new(handle: OutputStreamHandle) -> Result<Self> {
         let sink = Arc::new(Mutex::new(Sink::try_new(&handle)?));
-        let elapsed = Arc::new(Mutex::new(Duration::ZERO));
-        Ok(Self { sink, elapsed })
+        Ok(Self { sink })
     }
 
     pub fn clear(&self) {
