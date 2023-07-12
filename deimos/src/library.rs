@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use lofty::{Accessor, TaggedFileExt};
 use sqlx::{sqlite::SqliteConnectOptions, Pool, Sqlite, SqlitePool, Transaction};
-use std::{fs::File, os::unix::prelude::OsStrExt, path::Path, time::Duration};
+use std::{fs::File, os::unix::prelude::OsStrExt, path::Path};
 use symphonia::core::{formats::Track, io::MediaSourceStream};
 
 use walkdir::WalkDir;

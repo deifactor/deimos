@@ -3,7 +3,6 @@ use std::collections::{HashMap, HashSet};
 use anyhow::Result;
 use itertools::Itertools;
 use ratatui::{
-    backend::Backend,
     layout::Rect,
     style::{Color, Style},
     widgets::{Block, Borders, Paragraph},

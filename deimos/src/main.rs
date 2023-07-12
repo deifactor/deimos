@@ -4,7 +4,6 @@ mod artist_album_list;
 mod decoder;
 mod library;
 mod now_playing;
-mod player;
 mod track_list;
 mod ui;
 
@@ -19,10 +18,9 @@ use crossterm::{
 };
 use library::initialize_db;
 
-use player::Player;
 use ratatui::{backend::CrosstermBackend, Terminal};
 
-use rodio::OutputStream;
+use rodio::{OutputStream, Sink};
 use tokio_stream::StreamExt;
 
 #[tokio::main]
@@ -33,11 +31,11 @@ async fn main() -> Result<()> {
     let app = App::default();
 
     let (_output_stream, output_stream_handle) = OutputStream::try_default()?;
-    let player = Player::new(output_stream_handle)?;
+    let sink = Sink::try_new(&output_stream_handle)?;
 
     app.run(
         pool,
-        player,
+        sink,
         EventStream::new().filter_map(|ev| ev.ok()),
         terminal,
     )

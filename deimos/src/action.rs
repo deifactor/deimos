@@ -10,7 +10,7 @@ use std::{collections::HashMap, fmt::Debug};
 
 use anyhow::Result;
 
-
+use rodio::Sink;
 use sqlx::{Connection, Pool, Sqlite};
 
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
@@ -21,7 +21,6 @@ use crate::{
     decoder::TrackingSymphoniaDecoder,
     library,
     now_playing::PlayState,
-    player::Player,
     track_list::{Track, TrackList},
     ui::FocusTarget,
 };
@@ -85,7 +84,7 @@ impl Command {
     async fn execute(
         self,
         pool: &Pool<Sqlite>,
-        player: &Player,
+        sink: &Sink,
         tx_action: &UnboundedSender<Action>,
     ) -> Result<Option<Action>> {
         use Command::*;
@@ -154,9 +153,9 @@ impl Command {
                             .unwrap();
                     },
                 );
-                player.stop();
-                player.append(decoder);
-                player.play();
+                sink.stop();
+                sink.append(decoder);
+                sink.play();
                 None
             }
         };
@@ -166,13 +165,13 @@ impl Command {
     /// Spawns an executor task that will forever execute any commands sent via the returned command sender.
     pub fn spawn_executor(
         pool: Pool<Sqlite>,
-        player: Player,
+        sink: Sink,
         send_action: UnboundedSender<Action>,
     ) -> UnboundedSender<Command> {
         let (tx_cmd, mut rx_cmd) = unbounded_channel::<Command>();
         tokio::spawn(async move {
             while let Some(command) = rx_cmd.recv().await {
-                if let Some(action) = command.execute(&pool, &player, &send_action).await.unwrap() {
+                if let Some(action) = command.execute(&pool, &sink, &send_action).await.unwrap() {
                     send_action.send(action).unwrap();
                 }
             }
