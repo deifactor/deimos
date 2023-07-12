@@ -19,9 +19,9 @@ use crate::{
     app::App,
     artist_album_list::ArtistAlbumList,
     decoder::TrackingSymphoniaDecoder,
-    library,
+    library::{self, Track},
     now_playing::PlayState,
-    track_list::{Track, TrackList},
+    track_list::TrackList,
     ui::FocusTarget,
 };
 
@@ -122,7 +122,7 @@ impl Command {
                 let mut conn = pool.acquire().await?;
                 let tracks = sqlx::query_as!(
                     Track,
-                    r#"SELECT song_id, number, title
+                    r#"SELECT *
                        FROM songs WHERE artist = ? AND album = ?
                        ORDER BY number ASC NULLS FIRST"#,
                     artist,
@@ -135,13 +135,10 @@ impl Command {
 
             PlayTrack(song_id) => {
                 let mut conn = pool.acquire().await?;
-                let track = sqlx::query_as!(
-                    crate::now_playing::Track,
-                    "SELECT * FROM songs WHERE song_id = ?",
-                    song_id
-                )
-                .fetch_one(&mut *conn)
-                .await?;
+                let track =
+                    sqlx::query_as!(Track, "SELECT * FROM songs WHERE song_id = ?", song_id)
+                        .fetch_one(&mut *conn)
+                        .await?;
                 let tx_action = tx_action.clone();
                 let decoder = TrackingSymphoniaDecoder::from_path(&track.path)?.with_callback(
                     move |timestamp| {

@@ -7,14 +7,10 @@ use ratatui::{
     Frame,
 };
 
-use crate::ui::{Component, DeimosBackend, FocusTarget, Ui};
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct Track {
-    pub song_id: i64,
-    pub number: Option<i64>,
-    pub title: Option<String>,
-}
+use crate::{
+    library::Track,
+    ui::{Component, DeimosBackend, FocusTarget, Ui},
+};
 
 #[derive(Debug, Default)]
 pub struct TrackList {

@@ -1,10 +1,23 @@
 use anyhow::{bail, Context, Result};
 use lofty::{Accessor, TaggedFileExt};
+use ordered_float::OrderedFloat;
 use sqlx::{sqlite::SqliteConnectOptions, Pool, Sqlite, SqlitePool, Transaction};
 use std::{fs::File, os::unix::prelude::OsStrExt, path::Path};
-use symphonia::core::{formats::Track, io::MediaSourceStream};
+use symphonia::core::formats::Track as SymphoniaTrack;
+use symphonia::core::io::MediaSourceStream;
 
 use walkdir::WalkDir;
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Track {
+    pub song_id: i64,
+    pub number: Option<i64>,
+    pub path: String,
+    pub title: Option<String>,
+    pub album: Option<String>,
+    pub artist: Option<String>,
+    pub length: OrderedFloat<f64>,
+}
 
 /// Initialize the song database, creating all tables. This deletes any existing database.
 pub async fn initialize_db(path: impl AsRef<Path>) -> Result<Pool<Sqlite>> {
@@ -46,7 +59,7 @@ pub async fn find_music(path: impl AsRef<Path>, conn: &mut Transaction<'_, Sqlit
 
 async fn insert_song(
     path: &Path,
-    stream: &Track,
+    stream: &SymphoniaTrack,
     conn: &mut Transaction<'_, Sqlite>,
 ) -> Result<()> {
     let tagged_file = lofty::read_from_path(path)?;

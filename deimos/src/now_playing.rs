@@ -1,23 +1,11 @@
 use std::time::Duration;
 
-use ordered_float::OrderedFloat;
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout},
     widgets::Paragraph,
 };
 
-use crate::ui::Component;
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Track {
-    pub song_id: i64,
-    pub number: Option<i64>,
-    pub path: String,
-    pub title: Option<String>,
-    pub album: Option<String>,
-    pub artist: Option<String>,
-    pub length: OrderedFloat<f64>,
-}
+use crate::{library::Track, ui::Component};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct PlayState {
