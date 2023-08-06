@@ -15,6 +15,7 @@ lofty = "0.14.0"
 ordered-float = "3.7.0"
 ratatui = { version = "0.21.0", features = ["macros"] }
 rodio = { version = "0.17.1", default-features = false, features = ["symphonia-all"] }
+spectrum-analyzer = "1.4.0"
 sqlx = { version = "0.7", features = ["sqlite", "runtime-tokio"] }
 symphonia = { version = "0.5.3", features = ["all"] }
 tap = "1.0.1"

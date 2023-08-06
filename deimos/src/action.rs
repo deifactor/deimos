@@ -13,6 +13,7 @@ use anyhow::Result;
 use rodio::Sink;
 use sqlx::{Connection, Pool, Sqlite};
 
+use symphonia::core::audio::{AudioBuffer, Signal};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 
 use crate::{
@@ -21,6 +22,7 @@ use crate::{
     decoder::TrackingSymphoniaDecoder,
     library::{self, Track},
     now_playing::PlayState,
+    spectrogram::Visualizer,
     track_list::TrackList,
     ui::FocusTarget,
 };
@@ -29,7 +31,6 @@ use crate::{
 /// are semantic. For example, 'the user pressed the n key' is not a good
 /// choice for an action, but 'the user wants to advance in the current list'
 /// and 'the user input an n into the current text entry' are both good
-#[derive(Debug, PartialEq, Eq)]
 pub enum Action {
     NextFocus,
     MoveSelection(isize),
@@ -38,6 +39,7 @@ pub enum Action {
     SetTracks(Vec<Track>),
     PlaySelectedTrack,
     SetNowPlaying(Option<PlayState>),
+    UpdateSpectrum(AudioBuffer<f32>),
     Quit,
 }
 
@@ -64,6 +66,9 @@ impl Action {
             SetNowPlaying(play_state) => app.now_playing.play_state = play_state,
             ToggleExpansion => app.artist_album_list.toggle(),
             NextFocus => app.ui.focus = app.ui.focus.next(),
+            UpdateSpectrum(buf) => {
+                app.visualizer.update_spectrum(buf.chan(0)).unwrap();
+            }
             Quit => panic!("bye"),
         }
         Ok(())
@@ -141,13 +146,14 @@ impl Command {
                         .await?;
                 let tx_action = tx_action.clone();
                 let decoder = TrackingSymphoniaDecoder::from_path(&track.path)?.with_callback(
-                    move |timestamp| {
+                    move |buffer, timestamp| {
                         tx_action
                             .send(Action::SetNowPlaying(Some(PlayState {
                                 timestamp,
                                 track: track.clone(),
                             })))
                             .unwrap();
+                        tx_action.send(Action::UpdateSpectrum(buffer)).unwrap();
                     },
                 );
                 sink.stop();

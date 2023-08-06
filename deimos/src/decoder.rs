@@ -5,7 +5,7 @@ use rodio::Source;
 use std::{fs::File, path::Path, time::Duration};
 use symphonia::{
     core::{
-        audio::{AudioBufferRef, SampleBuffer, SignalSpec},
+        audio::{AudioBuffer, AudioBufferRef, SampleBuffer, SignalSpec},
         codecs::{Decoder, DecoderOptions},
         errors::Error,
         formats::{FormatOptions, FormatReader},
@@ -29,7 +29,7 @@ pub struct TrackingSymphoniaDecoder {
     format: Box<dyn FormatReader>,
     buffer: SampleBuffer<i16>,
     spec: SignalSpec,
-    callback: Option<Box<dyn FnMut(Duration) + Send + 'static>>,
+    callback: Option<Box<dyn FnMut(AudioBuffer<f32>, Duration) + Send + 'static>>,
 }
 
 impl TrackingSymphoniaDecoder {
@@ -85,7 +85,10 @@ impl TrackingSymphoniaDecoder {
     }
 
     /// Set the callback to invoke when updating the timestamp.
-    pub fn with_callback(self, callback: impl FnMut(Duration) + Send + 'static) -> Self {
+    pub fn with_callback(
+        self,
+        callback: impl FnMut(AudioBuffer<f32>, Duration) + Send + 'static,
+    ) -> Self {
         Self {
             callback: Some(Box::new(callback)),
             ..self
@@ -142,13 +145,8 @@ impl Iterator for TrackingSymphoniaDecoder {
                 // We only update the elapsed time when we get a new packet to
                 // avoid *constantly* updating it.
                 let timestamp = time_base.calc_time(packet.ts + packet.dur);
-                if let Some(callback) = &mut self.callback {
-                    callback(Duration::from_secs_f64(
-                        timestamp.seconds as f64 + timestamp.frac,
-                    ));
-                }
-                match self.decoder.decode(&packet) {
-                    Ok(decoded) => break decoded,
+                let decoded = match self.decoder.decode(&packet) {
+                    Ok(decoded) => decoded,
                     Err(e) => match e {
                         Error::DecodeError(_) => {
                             decode_errors += 1;
@@ -160,7 +158,16 @@ impl Iterator for TrackingSymphoniaDecoder {
                         }
                         _ => return None,
                     },
+                };
+                if let Some(callback) = &mut self.callback {
+                    let mut f32_buffer = decoded.make_equivalent::<f32>();
+                    decoded.convert(&mut f32_buffer);
+                    callback(
+                        f32_buffer,
+                        Duration::from_secs_f64(timestamp.seconds as f64 + timestamp.frac),
+                    );
                 }
+                break decoded;
             };
             self.spec = decoded.spec().to_owned();
             self.buffer = TrackingSymphoniaDecoder::get_buffer(decoded, &self.spec);
@@ -188,7 +195,7 @@ mod tests {
             Default::default(),
         );
         let decoder = TrackingSymphoniaDecoder::new(mss, Some("mp3"))?
-            .with_callback(move |dur| tx.send(dur).unwrap());
+            .with_callback(move |_, dur| tx.send(dur).unwrap());
         // drain the iterator to go all the way to the end
         for _ in decoder.into_iter() {}
         assert_eq!(rx.into_iter().last(), Some(Duration::from_secs(3)));

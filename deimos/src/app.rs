@@ -13,6 +13,7 @@ use crate::{
     action::{Action, Command},
     artist_album_list::ArtistAlbumList,
     now_playing::NowPlaying,
+    spectrogram::Visualizer,
     track_list::TrackList,
     ui::{Component, DeimosBackend, Ui},
 };
@@ -22,6 +23,7 @@ pub struct App {
     pub artist_album_list: ArtistAlbumList,
     pub track_list: TrackList,
     pub now_playing: NowPlaying,
+    pub visualizer: Visualizer,
     pub ui: Ui,
 }
 
@@ -45,7 +47,7 @@ impl App {
                     tx_action.send(action)?;
                 },
                 Some(action) = rx_action.recv() => {
-                    if action == Action::Quit {
+                    if matches!(action, Action::Quit) {
                         return Ok(())
                     } else {
                         action.dispatch(&mut self, &sender)?;
@@ -59,15 +61,20 @@ impl App {
     pub fn draw(&mut self, f: &mut Frame<'_, DeimosBackend>) -> Result<()> {
         let root = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Min(10), Constraint::Max(2)])
+            .constraints([Constraint::Min(10), Constraint::Max(6)])
             .split(f.size());
         let top = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
             .split(root[0]);
+        let bottom = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+            .split(root[1]);
         self.artist_album_list.draw(&self.ui, f, top[0])?;
         self.track_list.draw(&self.ui, f, top[1])?;
-        self.now_playing.draw(&self.ui, f, root[1])?;
+        self.now_playing.draw(&self.ui, f, bottom[0])?;
+        self.visualizer.draw(&self.ui, f, bottom[1])?;
         Ok(())
     }
 
