@@ -22,7 +22,6 @@ use crate::{
     decoder::TrackingSymphoniaDecoder,
     library::{self, Track},
     now_playing::PlayState,
-    spectrogram::Visualizer,
     track_list::TrackList,
     ui::FocusTarget,
 };
@@ -67,7 +66,7 @@ impl Action {
             ToggleExpansion => app.artist_album_list.toggle(),
             NextFocus => app.ui.focus = app.ui.focus.next(),
             UpdateSpectrum(buf) => {
-                app.visualizer.update_spectrum(buf.chan(0)).unwrap();
+                app.visualizer.update_spectrum(buf).unwrap();
             }
             Quit => panic!("bye"),
         }
