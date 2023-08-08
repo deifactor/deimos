@@ -1,5 +1,5 @@
 use anyhow::{bail, Context, Result};
-use lofty::{Accessor, TaggedFileExt};
+use lofty::{Accessor, ItemKey, TaggedFileExt};
 use ordered_float::OrderedFloat;
 use sqlx::{sqlite::SqliteConnectOptions, Pool, Sqlite, SqlitePool, Transaction};
 use std::{fs::File, os::unix::prelude::OsStrExt, path::Path};
@@ -68,7 +68,9 @@ async fn insert_song(
     let track = tag.track();
     let title = tag.title();
     let album = tag.album();
-    let artist = tag.artist();
+    let artist = tag
+        .get_string(&ItemKey::AlbumArtist)
+        .or(tag.get_string(&ItemKey::TrackArtist));
     let time_base = stream.codec_params.time_base.unwrap();
     let duration = time_base.calc_time(stream.codec_params.n_frames.unwrap());
     let duration = duration.seconds as f64 + duration.frac;
