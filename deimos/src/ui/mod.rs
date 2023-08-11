@@ -1,4 +1,11 @@
+pub mod artist_album_list;
+pub mod now_playing;
+pub mod search;
+pub mod spectrogram;
+pub mod track_list;
+
 use anyhow::Result;
+use crossterm::event::KeyCode;
 use ratatui::{
     backend::CrosstermBackend,
     layout::Rect,
@@ -6,6 +13,8 @@ use ratatui::{
     Frame,
 };
 use std::io::Stdout;
+
+use crate::action::Action;
 
 #[derive(Debug, Default)]
 pub struct Ui {
@@ -66,4 +75,9 @@ pub type DeimosBackend = CrosstermBackend<Stdout>;
 pub trait Component {
     /// Draw the component inside the given area of the frame.
     fn draw(&mut self, ui: &Ui, frame: &mut Frame<DeimosBackend>, area: Rect) -> Result<()>;
+
+    #[allow(unused_variables)]
+    fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Action> {
+        None
+    }
 }
