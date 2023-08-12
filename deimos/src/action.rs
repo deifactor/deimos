@@ -13,17 +13,20 @@ use anyhow::Result;
 use rodio::Sink;
 use sqlx::{Connection, Pool, Sqlite};
 
-use symphonia::core::audio::{AudioBuffer, Signal};
+use symphonia::core::audio::AudioBuffer;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 
 use crate::{
-    app::App,
-    artist_album_list::ArtistAlbumList,
+    app::{App, Mode},
     decoder::TrackingSymphoniaDecoder,
     library::{self, Track},
-    now_playing::PlayState,
-    track_list::TrackList,
     ui::FocusTarget,
+    ui::{
+        artist_album_list::ArtistAlbumList,
+        now_playing::PlayState,
+        search::{Search, SearchResult},
+        track_list::TrackList,
+    },
 };
 
 /// An [`Action`] corresponds to a mutation of the application state. Actions
@@ -39,6 +42,9 @@ pub enum Action {
     PlaySelectedTrack,
     SetNowPlaying(Option<PlayState>),
     UpdateSpectrum(AudioBuffer<f32>),
+    RunCommand(Command),
+    StartSearch,
+    SetSearchResults(Vec<SearchResult>),
     Quit,
 }
 
@@ -68,6 +74,12 @@ impl Action {
             UpdateSpectrum(buf) => {
                 app.visualizer.update_spectrum(buf).unwrap();
             }
+            RunCommand(command) => sender.send(command)?,
+            StartSearch => {
+                app.mode = Mode::Search;
+                app.search = Search::default();
+            }
+            SetSearchResults(results) => app.search.set_results(results),
             Quit => panic!("bye"),
         }
         Ok(())
@@ -82,6 +94,7 @@ pub enum Command {
     LoadLibrary,
     LoadTracks { artist: String, album: String },
     PlayTrack(i64),
+    Search { query: String },
 }
 
 impl Command {
@@ -91,9 +104,8 @@ impl Command {
         sink: &Sink,
         tx_action: &UnboundedSender<Action>,
     ) -> Result<Option<Action>> {
-        use Command::*;
         let action = match self {
-            LoadLibrary => {
+            Command::LoadLibrary => {
                 let mut conn = pool.acquire().await?;
                 let count = sqlx::query!("SELECT COUNT(*) AS count FROM songs")
                     .fetch_one(&mut *conn)
@@ -122,7 +134,7 @@ impl Command {
                 Some(Action::SetArtists(artists))
             }
 
-            LoadTracks { artist, album } => {
+            Command::LoadTracks { artist, album } => {
                 let mut conn = pool.acquire().await?;
                 let tracks = sqlx::query_as!(
                     Track,
@@ -137,7 +149,7 @@ impl Command {
                 Some(Action::SetTracks(tracks))
             }
 
-            PlayTrack(song_id) => {
+            Command::PlayTrack(song_id) => {
                 let mut conn = pool.acquire().await?;
                 let track =
                     sqlx::query_as!(Track, "SELECT * FROM songs WHERE song_id = ?", song_id)
@@ -159,6 +171,16 @@ impl Command {
                 sink.append(decoder);
                 sink.play();
                 None
+            }
+
+            Command::Search { query } => {
+                let mut conn = pool.acquire().await?;
+                let results = conn
+                    .transaction(|tx| {
+                        Box::pin(async move { Search::run_search_query(&query, tx).await })
+                    })
+                    .await?;
+                Some(Action::SetSearchResults(results))
             }
         };
         Ok(action)

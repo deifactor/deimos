@@ -11,12 +11,18 @@ use tokio_stream::{Stream, StreamExt};
 
 use crate::{
     action::{Action, Command},
-    artist_album_list::ArtistAlbumList,
-    now_playing::NowPlaying,
-    spectrogram::Visualizer,
-    track_list::TrackList,
-    ui::{Component, DeimosBackend, Ui},
+    ui::{
+        artist_album_list::ArtistAlbumList, now_playing::NowPlaying, search::Search,
+        spectrogram::Visualizer, track_list::TrackList, Component, DeimosBackend, Ui,
+    },
 };
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Mode {
+    #[default]
+    Play,
+    Search,
+}
 
 #[derive(Debug, Default)]
 pub struct App {
@@ -24,6 +30,8 @@ pub struct App {
     pub track_list: TrackList,
     pub now_playing: NowPlaying,
     pub visualizer: Visualizer,
+    pub search: Search,
+    pub mode: Mode,
     pub ui: Ui,
 }
 
@@ -59,26 +67,34 @@ impl App {
     }
 
     pub fn draw(&mut self, f: &mut Frame<'_, DeimosBackend>) -> Result<()> {
-        let root = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Min(10), Constraint::Max(6)])
-            .split(f.size());
-        let top = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
-            .split(root[0]);
-        let bottom = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
-            .split(root[1]);
-        self.artist_album_list.draw(&self.ui, f, top[0])?;
-        self.track_list.draw(&self.ui, f, top[1])?;
-        self.now_playing.draw(&self.ui, f, bottom[0])?;
-        self.visualizer.draw(&self.ui, f, bottom[1])?;
+        match self.mode {
+            Mode::Play => {
+                let root = Layout::default()
+                    .direction(Direction::Vertical)
+                    .constraints([Constraint::Min(10), Constraint::Max(6)])
+                    .split(f.size());
+                let top = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+                    .split(root[0]);
+                let bottom = Layout::default()
+                    .direction(Direction::Horizontal)
+                    .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+                    .split(root[1]);
+                self.artist_album_list.draw(&self.ui, f, top[0])?;
+                self.track_list.draw(&self.ui, f, top[1])?;
+                self.now_playing.draw(&self.ui, f, bottom[0])?;
+                self.visualizer.draw(&self.ui, f, bottom[1])?;
+            }
+
+            Mode::Search => {
+                self.search.draw(&self.ui, f, f.size())?;
+            }
+        }
         Ok(())
     }
 
-    fn terminal_to_action(&self, ev: Event) -> Option<Action> {
+    fn terminal_to_action(&mut self, ev: Event) -> Option<Action> {
         let Event::Key(KeyEvent { code, kind: KeyEventKind::Press, .. }) = ev else { return None };
         use Action::*;
         let action = match code {
@@ -88,7 +104,14 @@ impl App {
             KeyCode::Down => MoveSelection(1),
             KeyCode::Char(' ') => ToggleExpansion,
             KeyCode::Enter => PlaySelectedTrack,
-            _ => return None,
+            KeyCode::Char('/') => StartSearch,
+            other => {
+                if self.mode == Mode::Search {
+                    self.search.handle_keycode(other)?
+                } else {
+                    return None;
+                }
+            }
         };
         Some(action)
     }
