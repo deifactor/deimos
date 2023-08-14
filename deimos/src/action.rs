@@ -10,6 +10,7 @@ use std::{collections::HashMap, fmt::Debug};
 
 use anyhow::Result;
 
+use enum_iterator::next_cycle;
 use rodio::Sink;
 use sqlx::{Connection, Pool, Sqlite};
 
@@ -70,7 +71,7 @@ impl Action {
             }
             SetNowPlaying(play_state) => app.now_playing.play_state = play_state,
             ToggleExpansion => app.artist_album_list.toggle(),
-            NextFocus => app.ui.focus = app.ui.focus.next(),
+            NextFocus => app.ui.focus = next_cycle(&app.ui.focus).unwrap(),
             UpdateSpectrum(buf) => {
                 app.visualizer.update_spectrum(buf).unwrap();
             }

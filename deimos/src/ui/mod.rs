@@ -6,6 +6,7 @@ pub mod track_list;
 
 use anyhow::Result;
 use crossterm::event::KeyCode;
+use enum_iterator::Sequence;
 use ratatui::{
     backend::CrosstermBackend,
     layout::Rect,
@@ -51,21 +52,11 @@ impl Ui {
     }
 }
 
-#[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Sequence)]
 pub enum FocusTarget {
     #[default]
     ArtistAlbumList,
     TrackList,
-}
-
-impl FocusTarget {
-    pub fn next(self) -> Self {
-        use FocusTarget::*;
-        match self {
-            ArtistAlbumList => TrackList,
-            TrackList => ArtistAlbumList,
-        }
-    }
 }
 
 /// The type of the ratatui backend we use. We use a fixed backend so that [`Component`] doesn't have any generics, making it object-safe.
