@@ -9,7 +9,7 @@ use ratatui::{
 };
 use sqlx::{Sqlite, Transaction};
 
-use crate::action::{Action, Command};
+use crate::action::Command;
 
 use super::{Component, DeimosBackend};
 
@@ -138,7 +138,7 @@ impl Component for Search {
         Ok(())
     }
 
-    fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Action> {
+    fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Command> {
         let old_query = self.query.clone();
         match keycode {
             KeyCode::Backspace => {
@@ -148,9 +148,9 @@ impl Component for Search {
             _ => (),
         };
         if old_query != self.query {
-            Some(Action::RunCommand(Command::Search {
+            Some(Command::Search {
                 query: self.query.clone(),
-            }))
+            })
         } else {
             None
         }

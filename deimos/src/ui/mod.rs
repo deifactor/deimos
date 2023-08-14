@@ -15,7 +15,7 @@ use ratatui::{
 };
 use std::io::Stdout;
 
-use crate::action::Action;
+use crate::action::Command;
 
 #[derive(Debug, Default)]
 pub struct Ui {
@@ -68,7 +68,7 @@ pub trait Component {
     fn draw(&mut self, ui: &Ui, frame: &mut Frame<DeimosBackend>, area: Rect) -> Result<()>;
 
     #[allow(unused_variables)]
-    fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Action> {
+    fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Command> {
         None
     }
 }

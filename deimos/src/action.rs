@@ -10,7 +10,6 @@ use std::{collections::HashMap, fmt::Debug};
 
 use anyhow::Result;
 
-use enum_iterator::next_cycle;
 use rodio::Sink;
 use sqlx::{Connection, Pool, Sqlite};
 
@@ -18,10 +17,9 @@ use symphonia::core::audio::AudioBuffer;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 
 use crate::{
-    app::{App, Mode},
+    app::App,
     decoder::TrackingSymphoniaDecoder,
     library::{self, Track},
-    ui::FocusTarget,
     ui::{
         artist_album_list::ArtistAlbumList,
         now_playing::PlayState,
@@ -31,54 +29,31 @@ use crate::{
 };
 
 /// An [`Action`] corresponds to a mutation of the application state. Actions
-/// are semantic. For example, 'the user pressed the n key' is not a good
-/// choice for an action, but 'the user wants to advance in the current list'
-/// and 'the user input an n into the current text entry' are both good
+/// should only be used in cases where the mutation can't be done in the
+/// function creating it, either because
+///
+/// - it's a component handler, which only has a mutable reference to that
+/// component
+/// - it's in a [`Command::execute`] implementation, which doesn't
+/// have a reference to the app state at all
 pub enum Action {
-    NextFocus,
-    MoveSelection(isize),
-    ToggleExpansion,
     SetArtists(HashMap<String, Vec<String>>),
     SetTracks(Vec<Track>),
-    PlaySelectedTrack,
     SetNowPlaying(Option<PlayState>),
     UpdateSpectrum(AudioBuffer<f32>),
-    RunCommand(Command),
-    StartSearch,
     SetSearchResults(Vec<SearchResult>),
     Quit,
 }
 
 impl Action {
-    pub fn dispatch(self, app: &mut App, sender: &UnboundedSender<Command>) -> Result<()> {
+    pub fn dispatch(self, app: &mut App, _sender: &UnboundedSender<Command>) -> Result<()> {
         use Action::*;
         match self {
-            MoveSelection(amount) => match app.ui.focus {
-                FocusTarget::ArtistAlbumList => {
-                    app.artist_album_list.move_selection(amount);
-                    sync_track_list(app, sender)?;
-                }
-                FocusTarget::TrackList => {
-                    app.track_list.move_selection(amount);
-                }
-            },
             SetArtists(artists) => app.artist_album_list = ArtistAlbumList::new(artists),
             SetTracks(tracks) => app.track_list = TrackList::new(tracks),
-            PlaySelectedTrack => {
-                if let Some(selected) = app.track_list.selected() {
-                    sender.send(Command::PlayTrack(selected.song_id))?;
-                }
-            }
             SetNowPlaying(play_state) => app.now_playing.play_state = play_state,
-            ToggleExpansion => app.artist_album_list.toggle(),
-            NextFocus => app.ui.focus = next_cycle(&app.ui.focus).unwrap(),
             UpdateSpectrum(buf) => {
                 app.visualizer.update_spectrum(buf).unwrap();
-            }
-            RunCommand(command) => sender.send(command)?,
-            StartSearch => {
-                app.mode = Mode::Search;
-                app.search = Search::default();
             }
             SetSearchResults(results) => app.search.set_results(results),
             Quit => panic!("bye"),
@@ -87,15 +62,17 @@ impl Action {
     }
 }
 
-/// A [`Command`] talks to the external world in some way that we don't want to
-/// block on. For example, downloading data from the internet and talking to
-/// the database should both be done through a [`Command`].
-#[derive(Debug)]
+/// A [`Command`] is the way for components to either talk to the external
+/// world a nonblocking way or apply a global mutation to the application
+/// state. For example, downloading data from the internet and talking to the
+/// database should both be done through a [`Command`], and the artist/album
+/// tree browser needs to send a command to update the track list.
 pub enum Command {
     LoadLibrary,
     LoadTracks { artist: String, album: String },
     PlayTrack(i64),
     Search { query: String },
+    RunAction(Action),
 }
 
 impl Command {
@@ -183,6 +160,8 @@ impl Command {
                     .await?;
                 Some(Action::SetSearchResults(results))
             }
+
+            Command::RunAction(action) => Some(action),
         };
         Ok(action)
     }
@@ -204,15 +183,4 @@ impl Command {
         });
         tx_cmd
     }
-}
-
-fn sync_track_list(app: &mut App, sender: &UnboundedSender<Command>) -> Result<(), anyhow::Error> {
-    let artist = app.artist_album_list.artist();
-    let album = app.artist_album_list.album();
-    if let (Some(artist), Some(album)) = (artist, album) {
-        sender.send(Command::LoadTracks { artist, album })?;
-    } else {
-        Action::SetTracks(vec![]).dispatch(app, sender)?;
-    }
-    Ok(())
 }

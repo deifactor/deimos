@@ -1,5 +1,6 @@
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
+use enum_iterator::next_cycle;
 use ratatui::{
     layout::{Constraint, Direction, Layout},
     Frame, Terminal,
@@ -13,7 +14,7 @@ use crate::{
     action::{Action, Command},
     ui::{
         artist_album_list::ArtistAlbumList, now_playing::NowPlaying, search::Search,
-        spectrogram::Visualizer, track_list::TrackList, Component, DeimosBackend, Ui,
+        spectrogram::Visualizer, track_list::TrackList, Component, DeimosBackend, FocusTarget, Ui,
     },
 };
 
@@ -51,8 +52,8 @@ impl App {
         loop {
             tokio::select! {
                 Some(ev) = terminal_events.next() =>
-                if let Some(action) = self.terminal_to_action(ev) {
-                    tx_action.send(action)?;
+                if let Some(command) = self.handle_event(ev) {
+                    sender.send(command)?;
                 },
                 Some(action) = rx_action.recv() => {
                     if matches!(action, Action::Quit) {
@@ -94,25 +95,28 @@ impl App {
         Ok(())
     }
 
-    fn terminal_to_action(&mut self, ev: Event) -> Option<Action> {
+    fn focused(&mut self) -> &mut dyn Component {
+        match self.mode {
+            Mode::Play => match self.ui.focus {
+                FocusTarget::ArtistAlbumList => &mut self.artist_album_list,
+                FocusTarget::TrackList => &mut self.track_list,
+            },
+            Mode::Search => &mut self.search,
+        }
+    }
+
+    fn handle_event(&mut self, ev: Event) -> Option<Command> {
         let Event::Key(KeyEvent { code, kind: KeyEventKind::Press, .. }) = ev else { return None };
         use Action::*;
-        let action = match code {
-            KeyCode::Tab => NextFocus,
-            KeyCode::Esc | KeyCode::Char('q') => Quit,
-            KeyCode::Up => MoveSelection(-1),
-            KeyCode::Down => MoveSelection(1),
-            KeyCode::Char(' ') => ToggleExpansion,
-            KeyCode::Enter => PlaySelectedTrack,
-            KeyCode::Char('/') => StartSearch,
-            other => {
-                if self.mode == Mode::Search {
-                    self.search.handle_keycode(other)?
-                } else {
-                    return None;
-                }
+        match code {
+            KeyCode::Tab => self.ui.focus = next_cycle(&self.ui.focus).unwrap(),
+            KeyCode::Esc | KeyCode::Char('q') => return Some(Command::RunAction(Quit)),
+            KeyCode::Char('/') => {
+                self.mode = Mode::Search;
+                self.search = Search::default();
             }
-        };
-        Some(action)
+            _ => return self.focused().handle_keycode(code),
+        }
+        None
     }
 }

@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use anyhow::Result;
+use crossterm::event::KeyCode;
 use itertools::Itertools;
 use ratatui::{
     layout::Rect,
@@ -9,7 +10,10 @@ use ratatui::{
     Frame,
 };
 
-use crate::ui::{Component, DeimosBackend, FocusTarget, Ui};
+use crate::{
+    action::Command,
+    ui::{Component, DeimosBackend, FocusTarget, Ui},
+};
 
 #[derive(Debug)]
 struct ArtistItem {
@@ -177,5 +181,17 @@ impl Component for ArtistAlbumList {
             );
         }
         Ok(())
+    }
+
+    fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Command> {
+        match keycode {
+            KeyCode::Up => self.move_selection(-1),
+            KeyCode::Down => self.move_selection(1),
+            KeyCode::Enter | KeyCode::Char(' ') => self.toggle(),
+            _ => return None,
+        }
+        self.artist()
+            .zip(self.album())
+            .map(|(artist, album)| Command::LoadTracks { artist, album })
     }
 }
