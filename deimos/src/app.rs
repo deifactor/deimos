@@ -1,6 +1,5 @@
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
-use enum_iterator::next_cycle;
 use ratatui::{
     layout::{Constraint, Direction, Layout},
     Frame, Terminal,
@@ -15,7 +14,7 @@ use crate::{
     library_panel::LibraryPanel,
     ui::{
         now_playing::NowPlaying, search::Search, spectrogram::Visualizer, Component, DeimosBackend,
-        FocusTarget, Ui,
+        Ui,
     },
 };
 
@@ -85,27 +84,21 @@ impl App {
         Ok(())
     }
 
-    fn focused(&mut self) -> &mut dyn Component {
-        match self.mode {
-            Mode::Play => match self.ui.focus {
-                FocusTarget::ArtistAlbumList => &mut self.library_panel.artist_album_list,
-                FocusTarget::TrackList => &mut self.library_panel.track_list,
-            },
-            Mode::Search => &mut self.search,
-        }
-    }
-
     fn handle_event(&mut self, ev: Event) -> Option<Command> {
         let Event::Key(KeyEvent { code, kind: KeyEventKind::Press, .. }) = ev else { return None };
         use Action::*;
         match code {
-            KeyCode::Tab => self.ui.focus = next_cycle(&self.ui.focus).unwrap(),
             KeyCode::Esc | KeyCode::Char('q') => return Some(Command::RunAction(Quit)),
             KeyCode::Char('/') => {
                 self.mode = Mode::Search;
                 self.search = Search::default();
             }
-            _ => return self.focused().handle_keycode(code),
+            _ => {
+                return match self.mode {
+                    Mode::Play => self.library_panel.handle_keycode(code),
+                    Mode::Search => self.search.handle_keycode(code),
+                }
+            }
         }
         None
     }

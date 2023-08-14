@@ -39,9 +39,14 @@ impl Component for LibraryPanel {
 
     fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Command> {
         match keycode {
-            KeyCode::Tab => self.focus = next_cycle(&self.focus).unwrap(),
-            _ => (),
+            KeyCode::Tab => {
+                self.focus = next_cycle(&self.focus).unwrap();
+                None
+            }
+            _ => match self.focus {
+                PanelItem::ArtistAlbumList => self.artist_album_list.handle_keycode(keycode),
+                PanelItem::TrackList => self.track_list.handle_keycode(keycode),
+            },
         }
-        None
     }
 }
