@@ -4,7 +4,10 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 use crate::{
     action::Command,
-    ui::{artist_album_list::ArtistAlbumList, track_list::TrackList, Component, DeimosBackend, Ui},
+    ui::{
+        artist_album_list::ArtistAlbumList, track_list::TrackList, ActiveState, Component,
+        DeimosBackend, Ui,
+    },
 };
 
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Sequence)]
@@ -24,6 +27,7 @@ pub struct LibraryPanel {
 impl Component for LibraryPanel {
     fn draw(
         &mut self,
+        _state: ActiveState,
         ui: &Ui,
         frame: &mut ratatui::Frame<DeimosBackend>,
         area: Rect,
@@ -32,8 +36,18 @@ impl Component for LibraryPanel {
             .direction(Direction::Horizontal)
             .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
             .split(area);
-        self.artist_album_list.draw(ui, frame, layout[0])?;
-        self.track_list.draw(ui, frame, layout[1])?;
+        self.artist_album_list.draw(
+            ActiveState::focused_if(self.focus == PanelItem::ArtistAlbumList),
+            ui,
+            frame,
+            layout[0],
+        )?;
+        self.track_list.draw(
+            ActiveState::focused_if(self.focus == PanelItem::TrackList),
+            ui,
+            frame,
+            layout[1],
+        )?;
         Ok(())
     }
 

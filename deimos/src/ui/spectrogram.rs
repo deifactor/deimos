@@ -9,6 +9,8 @@ use symphonia::core::audio::{AudioBuffer, Signal};
 
 use crate::ui::Component;
 
+use super::ActiveState;
+
 #[derive(Debug, Clone)]
 pub struct VisualizerOptions {
     /// Number of samples to perform the FFT on. Must be a power of two. Keep
@@ -131,6 +133,7 @@ impl Visualizer {
 impl Component for Visualizer {
     fn draw(
         &mut self,
+        _state: ActiveState,
         _ui: &crate::ui::Ui,
         frame: &mut ratatui::Frame<crate::ui::DeimosBackend>,
         area: ratatui::layout::Rect,

@@ -11,8 +11,10 @@ use ratatui::{
 use crate::{
     action::Command,
     library::Track,
-    ui::{Component, DeimosBackend, FocusTarget, Ui},
+    ui::{Component, DeimosBackend, Ui},
 };
+
+use super::ActiveState;
 
 #[derive(Debug, Default)]
 pub struct TrackList {
@@ -51,11 +53,17 @@ impl TrackList {
 
 /// Drawing code
 impl Component for TrackList {
-    fn draw(&mut self, ui: &Ui, frame: &mut Frame<DeimosBackend>, area: Rect) -> Result<()> {
+    fn draw(
+        &mut self,
+        state: ActiveState,
+        ui: &Ui,
+        frame: &mut Frame<DeimosBackend>,
+        area: Rect,
+    ) -> Result<()> {
         let block = Block::default()
             .title("Tracks")
             .borders(Borders::ALL)
-            .border_style(ui.border(ui.is_focused(FocusTarget::TrackList)));
+            .border_style(ui.border(state));
 
         let list = List::new(
             self.tracks

@@ -20,7 +20,6 @@ use crate::action::Command;
 #[derive(Debug, Default)]
 pub struct Ui {
     pub theme: Theme,
-    pub focus: FocusTarget,
 }
 
 #[derive(Debug, Clone)]
@@ -39,16 +38,11 @@ impl Default for Theme {
 }
 
 impl Ui {
-    pub fn border(&self, is_focused: bool) -> Style {
-        if is_focused {
-            self.theme.focused_border
-        } else {
-            self.theme.unfocused_border
+    pub fn border(&self, state: ActiveState) -> Style {
+        match state {
+            ActiveState::Focused => self.theme.focused_border,
+            ActiveState::Inactive => self.theme.unfocused_border,
         }
-    }
-
-    pub fn is_focused(&self, target: FocusTarget) -> bool {
-        self.focus == target
     }
 }
 
@@ -62,10 +56,32 @@ pub enum FocusTarget {
 /// The type of the ratatui backend we use. We use a fixed backend so that [`Component`] doesn't have any generics, making it object-safe.
 pub type DeimosBackend = CrosstermBackend<Stdout>;
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum ActiveState {
+    Focused,
+    Inactive,
+}
+
+impl ActiveState {
+    pub fn focused_if(cond: bool) -> Self {
+        if cond {
+            Self::Focused
+        } else {
+            Self::Inactive
+        }
+    }
+}
+
 /// Generic component trait. Components are expected to contain their own state.
 pub trait Component {
     /// Draw the component inside the given area of the frame.
-    fn draw(&mut self, ui: &Ui, frame: &mut Frame<DeimosBackend>, area: Rect) -> Result<()>;
+    fn draw(
+        &mut self,
+        state: ActiveState,
+        ui: &Ui,
+        frame: &mut Frame<DeimosBackend>,
+        area: Rect,
+    ) -> Result<()>;
 
     #[allow(unused_variables)]
     fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Command> {

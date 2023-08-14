@@ -13,8 +13,8 @@ use crate::{
     action::{Action, Command},
     library_panel::LibraryPanel,
     ui::{
-        now_playing::NowPlaying, search::Search, spectrogram::Visualizer, Component, DeimosBackend,
-        Ui,
+        now_playing::NowPlaying, search::Search, spectrogram::Visualizer, ActiveState, Component,
+        DeimosBackend, Ui,
     },
 };
 
@@ -72,15 +72,21 @@ impl App {
             .constraints([Constraint::Min(10), Constraint::Max(6)])
             .split(f.size());
         match self.mode {
-            Mode::Play => self.library_panel.draw(&self.ui, f, root[0])?,
-            Mode::Search => self.search.draw(&self.ui, f, root[0])?,
+            Mode::Play => self
+                .library_panel
+                .draw(ActiveState::Focused, &self.ui, f, root[0])?,
+            Mode::Search => self
+                .search
+                .draw(ActiveState::Focused, &self.ui, f, root[0])?,
         }
         let bottom = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
             .split(root[1]);
-        self.now_playing.draw(&self.ui, f, bottom[0])?;
-        self.visualizer.draw(&self.ui, f, bottom[1])?;
+        self.now_playing
+            .draw(ActiveState::Inactive, &self.ui, f, bottom[0])?;
+        self.visualizer
+            .draw(ActiveState::Inactive, &self.ui, f, bottom[1])?;
         Ok(())
     }
 

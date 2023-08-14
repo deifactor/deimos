@@ -11,7 +11,7 @@ use sqlx::{Sqlite, Transaction};
 
 use crate::action::Command;
 
-use super::{Component, DeimosBackend};
+use super::{ActiveState, Component, DeimosBackend};
 
 /// Searches the library. Searches in album names, artist names, and track names.
 
@@ -112,11 +112,17 @@ impl Search {
 }
 
 impl Component for Search {
-    fn draw(&mut self, ui: &super::Ui, frame: &mut Frame<DeimosBackend>, area: Rect) -> Result<()> {
+    fn draw(
+        &mut self,
+        state: ActiveState,
+        ui: &super::Ui,
+        frame: &mut Frame<DeimosBackend>,
+        area: Rect,
+    ) -> Result<()> {
         let block = Block::default()
             .title("Search")
             .borders(Borders::ALL)
-            .border_style(ui.border(true));
+            .border_style(ui.border(state));
 
         let root = Layout::default()
             .direction(Direction::Vertical)

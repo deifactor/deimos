@@ -7,6 +7,8 @@ use ratatui::{
 
 use crate::{library::Track, ui::Component};
 
+use super::ActiveState;
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct PlayState {
     pub timestamp: Duration,
@@ -22,6 +24,7 @@ pub struct NowPlaying {
 impl Component for NowPlaying {
     fn draw(
         &mut self,
+        _state: ActiveState,
         _ui: &crate::ui::Ui,
         frame: &mut ratatui::Frame<crate::ui::DeimosBackend>,
         area: ratatui::layout::Rect,

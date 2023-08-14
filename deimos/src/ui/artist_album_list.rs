@@ -12,8 +12,10 @@ use ratatui::{
 
 use crate::{
     action::Command,
-    ui::{Component, DeimosBackend, FocusTarget, Ui},
+    ui::{Component, DeimosBackend, Ui},
 };
+
+use super::ActiveState;
 
 #[derive(Debug)]
 struct ArtistItem {
@@ -139,11 +141,17 @@ impl ArtistAlbumList {
 }
 
 impl Component for ArtistAlbumList {
-    fn draw(&mut self, ui: &Ui, frame: &mut Frame<DeimosBackend>, area: Rect) -> Result<()> {
+    fn draw(
+        &mut self,
+        state: ActiveState,
+        ui: &Ui,
+        frame: &mut Frame<DeimosBackend>,
+        area: Rect,
+    ) -> Result<()> {
         let block = Block::default()
             .title("Artist / Album")
             .borders(Borders::ALL)
-            .border_style(ui.border(ui.is_focused(FocusTarget::ArtistAlbumList)));
+            .border_style(ui.border(state));
 
         let inner = block.inner(area);
         frame.render_widget(block, area);
