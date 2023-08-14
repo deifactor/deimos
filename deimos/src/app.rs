@@ -12,9 +12,10 @@ use tokio_stream::{Stream, StreamExt};
 
 use crate::{
     action::{Action, Command},
+    library_panel::LibraryPanel,
     ui::{
-        artist_album_list::ArtistAlbumList, now_playing::NowPlaying, search::Search,
-        spectrogram::Visualizer, track_list::TrackList, Component, DeimosBackend, FocusTarget, Ui,
+        now_playing::NowPlaying, search::Search, spectrogram::Visualizer, Component, DeimosBackend,
+        FocusTarget, Ui,
     },
 };
 
@@ -27,8 +28,7 @@ pub enum Mode {
 
 #[derive(Debug, Default)]
 pub struct App {
-    pub artist_album_list: ArtistAlbumList,
-    pub track_list: TrackList,
+    pub library_panel: LibraryPanel,
     pub now_playing: NowPlaying,
     pub visualizer: Visualizer,
     pub search: Search,
@@ -68,38 +68,28 @@ impl App {
     }
 
     pub fn draw(&mut self, f: &mut Frame<'_, DeimosBackend>) -> Result<()> {
+        let root = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(10), Constraint::Max(6)])
+            .split(f.size());
         match self.mode {
-            Mode::Play => {
-                let root = Layout::default()
-                    .direction(Direction::Vertical)
-                    .constraints([Constraint::Min(10), Constraint::Max(6)])
-                    .split(f.size());
-                let top = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
-                    .split(root[0]);
-                let bottom = Layout::default()
-                    .direction(Direction::Horizontal)
-                    .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
-                    .split(root[1]);
-                self.artist_album_list.draw(&self.ui, f, top[0])?;
-                self.track_list.draw(&self.ui, f, top[1])?;
-                self.now_playing.draw(&self.ui, f, bottom[0])?;
-                self.visualizer.draw(&self.ui, f, bottom[1])?;
-            }
-
-            Mode::Search => {
-                self.search.draw(&self.ui, f, f.size())?;
-            }
+            Mode::Play => self.library_panel.draw(&self.ui, f, root[0])?,
+            Mode::Search => self.search.draw(&self.ui, f, root[0])?,
         }
+        let bottom = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+            .split(root[1]);
+        self.now_playing.draw(&self.ui, f, bottom[0])?;
+        self.visualizer.draw(&self.ui, f, bottom[1])?;
         Ok(())
     }
 
     fn focused(&mut self) -> &mut dyn Component {
         match self.mode {
             Mode::Play => match self.ui.focus {
-                FocusTarget::ArtistAlbumList => &mut self.artist_album_list,
-                FocusTarget::TrackList => &mut self.track_list,
+                FocusTarget::ArtistAlbumList => &mut self.library_panel.artist_album_list,
+                FocusTarget::TrackList => &mut self.library_panel.track_list,
             },
             Mode::Search => &mut self.search,
         }

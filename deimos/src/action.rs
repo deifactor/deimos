@@ -49,8 +49,10 @@ impl Action {
     pub fn dispatch(self, app: &mut App, _sender: &UnboundedSender<Command>) -> Result<()> {
         use Action::*;
         match self {
-            SetArtists(artists) => app.artist_album_list = ArtistAlbumList::new(artists),
-            SetTracks(tracks) => app.track_list = TrackList::new(tracks),
+            SetArtists(artists) => {
+                app.library_panel.artist_album_list = ArtistAlbumList::new(artists)
+            }
+            SetTracks(tracks) => app.library_panel.track_list = TrackList::new(tracks),
             SetNowPlaying(play_state) => app.now_playing.play_state = play_state,
             UpdateSpectrum(buf) => {
                 app.visualizer.update_spectrum(buf).unwrap();

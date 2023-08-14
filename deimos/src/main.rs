@@ -3,6 +3,7 @@ mod app;
 mod decoder;
 mod library;
 mod ui;
+mod library_panel;
 
 use std::{io, panic};
 
