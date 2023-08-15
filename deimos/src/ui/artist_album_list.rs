@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use crossterm::event::KeyCode;
 use itertools::Itertools;
 use ratatui::{
@@ -126,6 +126,37 @@ impl ArtistAlbumList {
             }
         }
     }
+
+    /// Move the selection to the given artist (and optionally album),
+    /// expanding it if they aren't already. Errors if that artist/album does not exist.
+    #[must_use]
+    pub fn select(&mut self, artist: &str, album: Option<&str>) -> Result<()> {
+        // XXX: linear scanning is inefficient!
+        let (artist_index, item) = self
+            .artists
+            .iter()
+            .find_position(|item| item.artist == artist)
+            .ok_or_else(|| anyhow!("couldn't find {artist}"))?;
+        let album_index = album
+            .map(|album| {
+                item.albums
+                    .iter()
+                    .position(|val| val.as_str() == album)
+                    .ok_or_else(|| anyhow!("couldn't find {album} for {artist}"))
+            })
+            .transpose()?;
+        self.expanded.insert(artist_index);
+        self.selected = Some(artist_index + album_index.map_or(0, |idx| idx + 1));
+        self.recompute_rows();
+        Ok(())
+    }
+
+    /// Command to dispatch to load the tracks for this album.
+    pub fn load_tracks_command(&self) -> Option<Command> {
+        self.artist()
+            .zip(self.album())
+            .map(|(artist, album)| Command::LoadTracks { artist, album })
+    }
 }
 
 /// Drawing code
@@ -198,8 +229,6 @@ impl Component for ArtistAlbumList {
             KeyCode::Enter | KeyCode::Char(' ') => self.toggle(),
             _ => return None,
         }
-        self.artist()
-            .zip(self.album())
-            .map(|(artist, album)| Command::LoadTracks { artist, album })
+        self.load_tracks_command()
     }
 }

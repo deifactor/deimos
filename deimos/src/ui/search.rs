@@ -9,7 +9,7 @@ use ratatui::{
 };
 use sqlx::{Sqlite, Transaction};
 
-use crate::action::Command;
+use crate::action::{Action, Command};
 
 use super::{ActiveState, Component, DeimosBackend};
 
@@ -31,6 +31,23 @@ pub enum SearchResult {
         album_artist: String,
         album: String,
     },
+}
+impl SearchResult {
+    pub fn album_artist(&self) -> &str {
+        match self {
+            SearchResult::Artist(artist) => &artist,
+            SearchResult::Album { album_artist, .. } => album_artist.as_str(),
+            SearchResult::Track { album_artist, .. } => album_artist.as_str(),
+        }
+    }
+
+    pub fn album(&self) -> Option<&str> {
+        match self {
+            SearchResult::Artist(_) => None,
+            SearchResult::Album { name, .. } => Some(name.as_str()),
+            SearchResult::Track { album, .. } => Some(album.as_str()),
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -151,6 +168,11 @@ impl Component for Search {
                 self.query.pop();
             }
             KeyCode::Char(c) => self.query.push(c),
+            KeyCode::Enter => {
+                return Some(Command::RunAction(Action::SelectEntity(
+                    self.results[0].clone(),
+                )))
+            }
             _ => (),
         };
         if old_query != self.query {

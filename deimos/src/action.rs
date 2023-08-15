@@ -17,7 +17,7 @@ use symphonia::core::audio::AudioBuffer;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 
 use crate::{
-    app::App,
+    app::{App, Mode},
     decoder::TrackingSymphoniaDecoder,
     library::{self, Track},
     ui::{
@@ -42,6 +42,7 @@ pub enum Action {
     SetNowPlaying(Option<PlayState>),
     UpdateSpectrum(AudioBuffer<f32>),
     SetSearchResults(Vec<SearchResult>),
+    SelectEntity(SearchResult),
     Quit,
 }
 
@@ -58,6 +59,13 @@ impl Action {
                 app.visualizer.update_spectrum(buf).unwrap();
             }
             SetSearchResults(results) => app.search.set_results(results),
+            SelectEntity(result) => {
+                app.mode = Mode::Play;
+                app.library_panel.select_entity(result);
+                if let Some(cmd) = app.library_panel.artist_album_list.load_tracks_command() {
+                    _sender.send(cmd)?;
+                }
+            }
             Quit => panic!("bye"),
         }
         Ok(())

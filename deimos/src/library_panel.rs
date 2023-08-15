@@ -5,8 +5,8 @@ use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use crate::{
     action::Command,
     ui::{
-        artist_album_list::ArtistAlbumList, track_list::TrackList, ActiveState, Component,
-        DeimosBackend, Ui,
+        artist_album_list::ArtistAlbumList, search::SearchResult, track_list::TrackList,
+        ActiveState, Component, DeimosBackend, Ui,
     },
 };
 
@@ -22,6 +22,14 @@ pub struct LibraryPanel {
     focus: PanelItem,
     pub artist_album_list: ArtistAlbumList,
     pub track_list: TrackList,
+}
+
+impl LibraryPanel {
+    pub(crate) fn select_entity(&mut self, result: SearchResult) {
+        self.artist_album_list
+            .select(result.album_artist(), result.album())
+            .unwrap();
+    }
 }
 
 impl Component for LibraryPanel {
