@@ -43,7 +43,6 @@ pub enum Action {
     UpdateSpectrum(AudioBuffer<f32>),
     SetSearchResults(Vec<SearchResult>),
     SelectEntity(SearchResult),
-    Quit,
 }
 
 impl Action {
@@ -66,7 +65,6 @@ impl Action {
                     _sender.send(cmd)?;
                 }
             }
-            Quit => panic!("bye"),
         }
         Ok(())
     }
@@ -83,6 +81,7 @@ pub enum Command {
     PlayTrack(i64),
     Search { query: String },
     RunAction(Action),
+    Quit,
 }
 
 impl Command {
@@ -172,6 +171,8 @@ impl Command {
             }
 
             Command::RunAction(action) => Some(action),
+
+            Command::Quit => panic!("we should have quit by now"),
         };
         Ok(action)
     }

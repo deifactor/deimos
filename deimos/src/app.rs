@@ -51,15 +51,15 @@ impl App {
         loop {
             tokio::select! {
                 Some(ev) = terminal_events.next() =>
-                if let Some(command) = self.handle_event(ev) {
-                    sender.send(command)?;
-                },
+                    if let Some(command) = self.handle_event(ev) {
+                        if matches!(command, Command::Quit) {
+                            return Ok(())
+                        }
+                        sender.send(command)?;
+
+                    },
                 Some(action) = rx_action.recv() => {
-                    if matches!(action, Action::Quit) {
-                        return Ok(())
-                    } else {
-                        action.dispatch(&mut self, &sender)?;
-                    }
+                    action.dispatch(&mut self, &sender)?;
                 }
             }
             terminal.draw(|f| self.draw(f).expect("failed to rerender app"))?;
@@ -92,9 +92,8 @@ impl App {
 
     fn handle_event(&mut self, ev: Event) -> Option<Command> {
         let Event::Key(KeyEvent { code, kind: KeyEventKind::Press, .. }) = ev else { return None };
-        use Action::*;
         match code {
-            KeyCode::Esc | KeyCode::Char('q') => return Some(Command::RunAction(Quit)),
+            KeyCode::Esc | KeyCode::Char('q') => return Some(Command::Quit),
             KeyCode::Char('/') => {
                 self.mode = Mode::Search;
                 self.search = Search::default();
