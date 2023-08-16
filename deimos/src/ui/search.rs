@@ -48,6 +48,13 @@ impl SearchResult {
             SearchResult::Track { album, .. } => Some(album.as_str()),
         }
     }
+
+    pub fn track_title(&self) -> Option<&str> {
+        match self {
+            SearchResult::Track { name, .. } => Some(name.as_str()),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Default)]

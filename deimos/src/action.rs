@@ -10,6 +10,7 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 
+use async_recursion::async_recursion;
 use rodio::Sink;
 use sqlx::{Connection, Pool, Sqlite};
 
@@ -43,10 +44,11 @@ pub enum Action {
     UpdateSpectrum(AudioBuffer<f32>),
     SetSearchResults(Vec<SearchResult>),
     SelectEntity(SearchResult),
+    SelectEntityTracksLoaded(String),
 }
 
 impl Action {
-    pub fn dispatch(self, app: &mut App, _sender: &UnboundedSender<Command>) -> Result<()> {
+    pub fn dispatch(self, app: &mut App, sender: &UnboundedSender<Command>) -> Result<()> {
         use Action::*;
         match self {
             SetArtists(artists) => {
@@ -60,11 +62,19 @@ impl Action {
             SetSearchResults(results) => app.search.set_results(results),
             SelectEntity(result) => {
                 app.mode = Mode::Play;
-                app.library_panel.select_entity(result);
+                app.library_panel.select_entity(&result);
                 if let Some(cmd) = app.library_panel.artist_album_list.load_tracks_command() {
-                    _sender.send(cmd)?;
+                    if let Some(title) = result.track_title() {
+                        sender.send(Command::Sequence(vec![
+                            cmd,
+                            Command::RunAction(SelectEntityTracksLoaded(title.to_owned())),
+                        ]))?;
+                    } else {
+                        sender.send(cmd)?;
+                    }
                 }
             }
+            SelectEntityTracksLoaded(title) => app.library_panel.track_list.select(&title),
         }
         Ok(())
     }
@@ -77,14 +87,23 @@ impl Action {
 /// tree browser needs to send a command to update the track list.
 pub enum Command {
     LoadLibrary,
-    LoadTracks { artist: String, album: String },
+    LoadTracks {
+        artist: String,
+        album: String,
+    },
     PlayTrack(i64),
-    Search { query: String },
+    Search {
+        query: String,
+    },
     RunAction(Action),
+    /// Perform these commands in sequence. All commands are executed in
+    /// sequence and then their actions are applied.
+    Sequence(Vec<Command>),
     Quit,
 }
 
 impl Command {
+    #[async_recursion]
     async fn execute(
         self,
         pool: &Pool<Sqlite>,
@@ -92,6 +111,15 @@ impl Command {
         tx_action: &UnboundedSender<Action>,
     ) -> Result<Option<Action>> {
         let action = match self {
+            Command::Sequence(actions) => {
+                for cmd in actions {
+                    let action = cmd.execute(pool, sink, tx_action).await?;
+                    if let Some(action) = action {
+                        tx_action.send(action)?;
+                    }
+                }
+                None
+            }
             Command::LoadLibrary => {
                 let artists = library::load_library(pool).await?;
                 Some(Action::SetArtists(artists))

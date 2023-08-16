@@ -146,8 +146,11 @@ impl ArtistAlbumList {
             })
             .transpose()?;
         self.expanded.insert(artist_index);
-        self.selected = Some(artist_index + album_index.map_or(0, |idx| idx + 1));
         self.recompute_rows();
+        self.selected = self
+            .rows
+            .iter()
+            .position(|row| row.artist == artist_index && row.album == album_index);
         Ok(())
     }
 

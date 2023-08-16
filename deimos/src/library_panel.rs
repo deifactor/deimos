@@ -25,7 +25,7 @@ pub struct LibraryPanel {
 }
 
 impl LibraryPanel {
-    pub(crate) fn select_entity(&mut self, result: SearchResult) {
+    pub(crate) fn select_entity(&mut self, result: &SearchResult) {
         self.artist_album_list
             .select(result.album_artist(), result.album())
             .unwrap();

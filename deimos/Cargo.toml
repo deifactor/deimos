@@ -8,6 +8,7 @@ repository = "http://github.com/deifactor/deimos"
 
 [dependencies]
 anyhow = { version = "1.0.71", features = ["backtrace"] }
+async-recursion = "1.0.4"
 crossbeam = "0.8.2"
 crossterm = { version = "0.26.1", features = ["event-stream"] }
 enum-iterator = "1.4.1"

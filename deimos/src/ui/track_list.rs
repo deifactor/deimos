@@ -46,6 +46,14 @@ impl TrackList {
         });
     }
 
+    pub fn select(&mut self, title: &str) {
+        self.state.select(
+            self.tracks
+                .iter()
+                .position(|track| track.title.as_ref().map_or(false, |t| t.as_str() == title)),
+        )
+    }
+
     pub fn selected(&self) -> Option<&Track> {
         self.state.selected().map(|i| &self.tracks[i])
     }
