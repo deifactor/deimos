@@ -48,7 +48,7 @@ pub enum Action {
 }
 
 impl Action {
-    pub fn dispatch(self, app: &mut App, sender: &UnboundedSender<Command>) -> Result<()> {
+    pub fn dispatch(self, app: &mut App) -> Result<Option<Command>> {
         use Action::*;
         match self {
             SetArtists(artists) => {
@@ -65,18 +65,18 @@ impl Action {
                 app.library_panel.select_entity(&result);
                 if let Some(cmd) = app.library_panel.artist_album_list.load_tracks_command() {
                     if let Some(title) = result.track_title() {
-                        sender.send(Command::Sequence(vec![
+                        return Ok(Some(Command::Sequence(vec![
                             cmd,
                             Command::RunAction(SelectEntityTracksLoaded(title.to_owned())),
-                        ]))?;
+                        ])));
                     } else {
-                        sender.send(cmd)?;
+                        return Ok(Some(cmd));
                     }
                 }
             }
             SelectEntityTracksLoaded(title) => app.library_panel.track_list.select(&title),
         }
-        Ok(())
+        return Ok(None);
     }
 }
 

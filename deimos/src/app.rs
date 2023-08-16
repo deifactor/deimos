@@ -59,7 +59,9 @@ impl App {
 
                     },
                 Some(action) = rx_action.recv() => {
-                    action.dispatch(&mut self, &sender)?;
+                    if let Some(command) = action.dispatch(&mut self)? {
+                        sender.send(command)?;
+                    }
                 }
             }
             terminal.draw(|f| self.draw(f).expect("failed to rerender app"))?;
