@@ -2,8 +2,8 @@ mod action;
 mod app;
 mod decoder;
 mod library;
-mod ui;
 mod library_panel;
+mod ui;
 
 use std::{io, panic};
 
@@ -72,36 +72,4 @@ fn restore_terminal() -> Result<()> {
     disable_raw_mode()?;
     execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
     Ok(())
-}
-
-/// Utility macro for cloning some variables and moving them into a
-/// closure. Write it like `cc!(some_var, || some_var.do_thing())`. This uses
-/// the `,` separator since that makes it look 'function-like' enough that
-/// autoformatters will behave properly.
-#[macro_export]
-macro_rules! cc {
-    ($($n:ident),+, || $body:block) => (
-        {
-            $( let $n = $n.clone(); )+
-            move || { $body }
-        }
-    );
-    ($($n:ident),+, || $body:expr) => (
-        {
-            $( let $n = $n.clone(); )+
-            move || $body
-        }
-    );
-    ($($n:ident),+, |$($p:ident),+| $body:block) => (
-        {
-            $( let $n = $n.clone(); )+
-            move |$($p),+| { $body }
-        }
-    );
-    ($($n:ident),+, |$($p:ident),+| $body:expr) => (
-        {
-            $( let $n = $n.clone(); )+
-            move |$($p),+| $body
-        }
-    );
 }
