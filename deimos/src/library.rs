@@ -1,7 +1,9 @@
 use anyhow::{bail, Context, Result};
 use lofty::{Accessor, ItemKey, TaggedFileExt};
 use ordered_float::OrderedFloat;
+use sqlx::Connection;
 use sqlx::{sqlite::SqliteConnectOptions, Pool, Sqlite, SqlitePool, Transaction};
+use std::collections::HashMap;
 use std::{fs::File, os::unix::prelude::OsStrExt, path::Path};
 use symphonia::core::formats::Track as SymphoniaTrack;
 use symphonia::core::io::MediaSourceStream;
@@ -32,7 +34,7 @@ pub async fn initialize_db(path: impl AsRef<Path>) -> Result<Pool<Sqlite>> {
     Ok(pool)
 }
 
-pub async fn find_music(path: impl AsRef<Path>, conn: &mut Transaction<'_, Sqlite>) -> Result<()> {
+async fn find_music(path: impl AsRef<Path>, conn: &mut Transaction<'_, Sqlite>) -> Result<()> {
     let probe = symphonia::default::get_probe();
     for entry in WalkDir::new(path)
         .into_iter()
@@ -86,4 +88,32 @@ async fn insert_song(
     .execute(&mut **conn)
     .await?;
     Ok(())
+}
+
+/// Performs the initial library load. Returns a map from artist names to their albums.
+pub async fn load_library(
+    pool: &Pool<Sqlite>,
+) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
+    let mut conn = pool.acquire().await?;
+    let count = sqlx::query!("SELECT COUNT(*) AS count FROM songs")
+        .fetch_one(&mut *conn)
+        .await?
+        .count;
+    if count == 0 {
+        conn.transaction(|conn| {
+            Box::pin(async move { find_music("/home/vector/music", conn).await })
+        })
+        .await?;
+    }
+    let mut artists: HashMap<String, Vec<String>> = HashMap::new();
+    sqlx::query!(
+        r#"SELECT DISTINCT artist AS "artist!", album AS "album!"
+                       FROM songs WHERE artist IS NOT NULL AND album IS NOT NULL
+                       ORDER BY artist, album"#
+    )
+    .fetch_all(&mut *conn)
+    .await?
+    .into_iter()
+    .for_each(|row| artists.entry(row.artist).or_default().push(row.album));
+    Ok(artists)
 }

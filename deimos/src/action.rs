@@ -6,7 +6,7 @@
 /// - We don't have to box them all the time (performance doesn't matter, but it's verbose)
 /// - We can make their methods take them by move (can't call a by-move method on a boxed trait object)
 /// - Less verbose to declare a new action
-use std::{collections::HashMap, fmt::Debug};
+use std::collections::HashMap;
 
 use anyhow::Result;
 
@@ -93,31 +93,7 @@ impl Command {
     ) -> Result<Option<Action>> {
         let action = match self {
             Command::LoadLibrary => {
-                let mut conn = pool.acquire().await?;
-                let count = sqlx::query!("SELECT COUNT(*) AS count FROM songs")
-                    .fetch_one(&mut *conn)
-                    .await?
-                    .count;
-                // only reinitialize db if there are no songs
-                if count == 0 {
-                    conn.transaction(|conn| {
-                        Box::pin(
-                            async move { library::find_music("/home/vector/music", conn).await },
-                        )
-                    })
-                    .await?;
-                }
-
-                let mut artists: HashMap<String, Vec<String>> = HashMap::new();
-                sqlx::query!(
-                    r#"SELECT DISTINCT artist AS "artist!", album AS "album!"
-                       FROM songs WHERE artist IS NOT NULL AND album IS NOT NULL
-                       ORDER BY artist, album"#
-                )
-                .fetch_all(&mut *conn)
-                .await?
-                .into_iter()
-                .for_each(|row| artists.entry(row.artist).or_default().push(row.album));
+                let artists = library::load_library(pool).await?;
                 Some(Action::SetArtists(artists))
             }
 
