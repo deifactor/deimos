@@ -15,10 +15,7 @@ use super::{ActiveState, Component, DeimosBackend};
 
 /// Searches the library. Searches in album names, artist names, and track names.
 
-/// Things that match the search. Note that, for example, a `Track` result can
-/// still be returned because the artist name matched; this enables the use
-/// case of "I can't remember the name of the song, but I know the artist
-/// name".
+/// Things that match the search.
 #[derive(Debug, Clone)]
 pub enum SearchResult {
     Artist(String),

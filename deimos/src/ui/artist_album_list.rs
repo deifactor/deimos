@@ -156,9 +156,10 @@ impl ArtistAlbumList {
 
     /// Command to dispatch to load the tracks for this album.
     pub fn load_tracks_command(&self) -> Option<Command> {
-        self.artist()
-            .zip(self.album())
-            .map(|(artist, album)| Command::LoadTracks { artist, album })
+        self.artist().map(|artist| Command::LoadTracks {
+            artist,
+            album: self.album(),
+        })
     }
 }
 

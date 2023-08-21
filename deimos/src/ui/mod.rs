@@ -10,7 +10,7 @@ use enum_iterator::Sequence;
 use ratatui::{
     backend::CrosstermBackend,
     layout::Rect,
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     Frame,
 };
 use std::io::Stdout;
@@ -26,6 +26,7 @@ pub struct Ui {
 pub struct Theme {
     pub focused_border: Style,
     pub unfocused_border: Style,
+    pub section_header: Style,
 }
 
 impl Default for Theme {
@@ -33,6 +34,9 @@ impl Default for Theme {
         Self {
             focused_border: Style::default().fg(Color::Blue),
             unfocused_border: Default::default(),
+            section_header: Style::default()
+                .bg(Color::Rgb(0, 0, 60))
+                .add_modifier(Modifier::BOLD | Modifier::ITALIC),
         }
     }
 }

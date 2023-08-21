@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use anyhow::Result;
 
 use async_recursion::async_recursion;
+use itertools::Itertools;
 use rodio::Sink;
 use sqlx::{Connection, Pool, Sqlite};
 
@@ -25,7 +26,7 @@ use crate::{
         artist_album_list::ArtistAlbumList,
         now_playing::PlayState,
         search::{Search, SearchResult},
-        track_list::TrackList,
+        track_list::{TrackList, TrackListItem},
     },
 };
 
@@ -40,6 +41,7 @@ use crate::{
 pub enum Action {
     SetArtists(HashMap<String, Vec<String>>),
     SetTracks(Vec<Track>),
+    SetTracksMultiAlbum(Vec<(String, Vec<Track>)>),
     SetNowPlaying(Option<PlayState>),
     UpdateSpectrum(AudioBuffer<f32>),
     SetSearchResults(Vec<SearchResult>),
@@ -54,7 +56,21 @@ impl Action {
             SetArtists(artists) => {
                 app.library_panel.artist_album_list = ArtistAlbumList::new(artists)
             }
-            SetTracks(tracks) => app.library_panel.track_list = TrackList::new(tracks),
+            SetTracks(tracks) => {
+                app.library_panel.track_list =
+                    TrackList::new(tracks.into_iter().map(TrackListItem::Track).collect())
+            }
+            SetTracksMultiAlbum(albums) => {
+                app.library_panel.track_list = TrackList::new(
+                    albums
+                        .into_iter()
+                        .flat_map(|(title, tracks)| {
+                            std::iter::once(TrackListItem::Section(title))
+                                .chain(tracks.into_iter().map(TrackListItem::Track))
+                        })
+                        .collect(),
+                )
+            }
             SetNowPlaying(play_state) => app.now_playing.play_state = play_state,
             UpdateSpectrum(buf) => {
                 app.visualizer.update_spectrum(buf).unwrap();
@@ -89,7 +105,7 @@ pub enum Command {
     LoadLibrary,
     LoadTracks {
         artist: String,
-        album: String,
+        album: Option<String>,
     },
     PlayTrack(i64),
     Search {
@@ -127,17 +143,39 @@ impl Command {
 
             Command::LoadTracks { artist, album } => {
                 let mut conn = pool.acquire().await?;
-                let tracks = sqlx::query_as!(
-                    Track,
-                    r#"SELECT *
-                       FROM songs WHERE artist = ? AND album = ?
-                       ORDER BY number ASC NULLS FIRST"#,
-                    artist,
-                    album
-                )
-                .fetch_all(&mut *conn)
-                .await?;
-                Some(Action::SetTracks(tracks))
+                match album {
+                    Some(album) => {
+                        // just load the tracks for that album
+                        let tracks = sqlx::query_as!(
+                            Track,
+                            r#"SELECT *
+                               FROM songs WHERE artist = ? AND album = ?
+                               ORDER BY number ASC NULLS FIRST"#,
+                            artist,
+                            album
+                        )
+                        .fetch_all(&mut *conn)
+                        .await?;
+                        Some(Action::SetTracks(tracks))
+                    }
+                    None => {
+                        let tracks = sqlx::query_as!(
+                            Track,
+                            r#"SELECT *
+                            FROM songs WHERE artist = ? AND album IS NOT NULL
+                            ORDER BY album, number ASC"#,
+                            artist
+                        )
+                        .fetch_all(&mut *conn)
+                        .await?
+                        .into_iter()
+                        .group_by(|track| track.album.clone().unwrap())
+                        .into_iter()
+                        .map(|(title, tracks)| (title, tracks.into_iter().collect_vec()))
+                        .collect_vec();
+                        Some(Action::SetTracksMultiAlbum(tracks))
+                    }
+                }
             }
 
             Command::PlayTrack(song_id) => {
