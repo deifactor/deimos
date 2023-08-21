@@ -32,7 +32,7 @@ pub enum SearchResult {
 impl SearchResult {
     pub fn album_artist(&self) -> &str {
         match self {
-            SearchResult::Artist(artist) => &artist,
+            SearchResult::Artist(artist) => artist,
             SearchResult::Album { album_artist, .. } => album_artist.as_str(),
             SearchResult::Track { album_artist, .. } => album_artist.as_str(),
         }

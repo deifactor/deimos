@@ -92,7 +92,7 @@ impl Action {
             }
             SelectEntityTracksLoaded(title) => app.library_panel.track_list.select(&title),
         }
-        return Ok(None);
+        Ok(None)
     }
 }
 

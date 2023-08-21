@@ -129,7 +129,6 @@ impl ArtistAlbumList {
 
     /// Move the selection to the given artist (and optionally album),
     /// expanding it if they aren't already. Errors if that artist/album does not exist.
-    #[must_use]
     pub fn select(&mut self, artist: &str, album: Option<&str>) -> Result<()> {
         // XXX: linear scanning is inefficient!
         let (artist_index, item) = self
