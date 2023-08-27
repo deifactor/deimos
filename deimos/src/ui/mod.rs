@@ -6,7 +6,6 @@ pub mod track_list;
 
 use anyhow::Result;
 use crossterm::event::KeyCode;
-use enum_iterator::Sequence;
 use ratatui::{
     backend::CrosstermBackend,
     layout::Rect,
@@ -48,13 +47,6 @@ impl Ui {
             ActiveState::Inactive => self.theme.unfocused_border,
         }
     }
-}
-
-#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Sequence)]
-pub enum FocusTarget {
-    #[default]
-    ArtistAlbumList,
-    TrackList,
 }
 
 /// The type of the ratatui backend we use. We use a fixed backend so that [`Component`] doesn't have any generics, making it object-safe.
