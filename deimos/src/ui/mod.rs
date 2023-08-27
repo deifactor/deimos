@@ -4,13 +4,11 @@ pub mod search;
 pub mod spectrogram;
 pub mod track_list;
 
-use anyhow::Result;
+
 use crossterm::event::KeyCode;
 use ratatui::{
     backend::CrosstermBackend,
-    layout::Rect,
     style::{Color, Modifier, Style},
-    Frame,
 };
 use std::io::Stdout;
 
@@ -70,15 +68,6 @@ impl ActiveState {
 
 /// Generic component trait. Components are expected to contain their own state.
 pub trait Component {
-    /// Draw the component inside the given area of the frame.
-    fn draw(
-        &mut self,
-        state: ActiveState,
-        ui: &Ui,
-        frame: &mut Frame<DeimosBackend>,
-        area: Rect,
-    ) -> Result<()>;
-
     #[allow(unused_variables)]
     fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Command> {
         None

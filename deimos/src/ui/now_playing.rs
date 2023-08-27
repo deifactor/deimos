@@ -5,9 +5,7 @@ use ratatui::{
     widgets::Paragraph,
 };
 
-use crate::{library::Track, ui::Component};
-
-use super::ActiveState;
+use crate::library::Track;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct PlayState {
@@ -21,10 +19,9 @@ pub struct NowPlaying {
 }
 
 /// Drawing code
-impl Component for NowPlaying {
-    fn draw(
+impl NowPlaying {
+    pub fn draw(
         &mut self,
-        _state: ActiveState,
         _ui: &crate::ui::Ui,
         frame: &mut ratatui::Frame<crate::ui::DeimosBackend>,
         area: ratatui::layout::Rect,

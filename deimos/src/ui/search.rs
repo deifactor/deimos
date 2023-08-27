@@ -130,12 +130,9 @@ impl Search {
             }));
         Ok(results)
     }
-}
 
-impl Component for Search {
-    fn draw(
+    pub fn draw(
         &mut self,
-        state: ActiveState,
         ui: &super::Ui,
         frame: &mut Frame<DeimosBackend>,
         area: Rect,
@@ -143,7 +140,7 @@ impl Component for Search {
         let block = Block::default()
             .title("Search")
             .borders(Borders::ALL)
-            .border_style(ui.border(state));
+            .border_style(ui.border(ActiveState::Focused));
 
         let root = Layout::default()
             .direction(Direction::Vertical)
@@ -164,7 +161,9 @@ impl Component for Search {
         frame.render_stateful_widget(results, root[1], &mut self.state);
         Ok(())
     }
+}
 
+impl Component for Search {
     fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Command> {
         let old_query = self.query.clone();
         match keycode {

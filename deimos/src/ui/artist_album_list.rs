@@ -172,10 +172,8 @@ impl ArtistAlbumList {
             None => artist.artist.clone(),
         }
     }
-}
 
-impl Component for ArtistAlbumList {
-    fn draw(
+    pub fn draw(
         &mut self,
         state: ActiveState,
         ui: &Ui,
@@ -224,7 +222,9 @@ impl Component for ArtistAlbumList {
         }
         Ok(())
     }
+}
 
+impl Component for ArtistAlbumList {
     fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Command> {
         match keycode {
             KeyCode::Up => self.move_selection(-1),

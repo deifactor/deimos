@@ -7,10 +7,6 @@ use spectrum_analyzer::{
 };
 use symphonia::core::audio::{AudioBuffer, Signal};
 
-use crate::ui::Component;
-
-use super::ActiveState;
-
 #[derive(Debug, Clone)]
 pub struct VisualizerOptions {
     /// Number of samples to perform the FFT on. Must be a power of two. Keep
@@ -128,12 +124,9 @@ impl Visualizer {
         let min_freq = self.options.min_freq;
         (0..n).map(move |i| min_freq * step.powi(i as i32))
     }
-}
 
-impl Component for Visualizer {
-    fn draw(
+    pub fn draw(
         &mut self,
-        _state: ActiveState,
         _ui: &crate::ui::Ui,
         frame: &mut ratatui::Frame<crate::ui::DeimosBackend>,
         area: ratatui::layout::Rect,

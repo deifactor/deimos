@@ -30,12 +30,9 @@ impl LibraryPanel {
             .select(result.album_artist(), result.album())
             .unwrap();
     }
-}
 
-impl Component for LibraryPanel {
-    fn draw(
+    pub fn draw(
         &mut self,
-        _state: ActiveState,
         ui: &Ui,
         frame: &mut ratatui::Frame<DeimosBackend>,
         area: Rect,
@@ -58,7 +55,9 @@ impl Component for LibraryPanel {
         )?;
         Ok(())
     }
+}
 
+impl Component for LibraryPanel {
     fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Command> {
         match keycode {
             KeyCode::Tab => {

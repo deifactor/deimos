@@ -102,11 +102,8 @@ impl TrackList {
             _ => panic!("Somehow selected a non-track"),
         })
     }
-}
 
-/// Drawing code
-impl Component for TrackList {
-    fn draw(
+    pub fn draw(
         &mut self,
         state: ActiveState,
         ui: &Ui,
@@ -129,7 +126,9 @@ impl Component for TrackList {
         frame.render_stateful_widget(list, area, &mut self.state);
         Ok(())
     }
+}
 
+impl Component for TrackList {
     fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Command> {
         match keycode {
             KeyCode::Up => self.move_selection(-1),
