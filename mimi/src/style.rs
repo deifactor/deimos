@@ -1,7 +1,6 @@
 /// Functionality for colors, modifiers (bold/underline), etc.
 use std::collections::HashSet;
 
-
 /// Any formatting information that isn't foreground or background color.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 #[allow(missing_docs)]
@@ -79,8 +78,7 @@ impl Color {
 
 /// Describes the foreground color, background color, and any additional
 /// modifications (inverse, bold, etc).
-#[derive(Clone, Debug, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct Style {
     /// The color used to render the text. If `None`, uses whatever the
     /// terminal's default color is.
@@ -91,8 +89,6 @@ pub struct Style {
     /// Any extra formatting information, such as bold/italic.
     pub modifiers: HashSet<Modifier>,
 }
-
-
 
 impl Style {
     /// Combines the two styles. If `other` has a foreground color specified,

@@ -13,8 +13,8 @@ use crate::{
     action::{Action, Command},
     library_panel::LibraryPanel,
     ui::{
-        now_playing::NowPlaying, search::Search, spectrogram::Visualizer, Component,
-        DeimosBackend, Ui,
+        now_playing::NowPlaying, search::Search, spectrogram::Visualizer, Component, DeimosBackend,
+        Ui,
     },
 };
 

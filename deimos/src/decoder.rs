@@ -21,6 +21,8 @@ use symphonia::{
 // But a decode error in more than 3 consecutive packets is fatal.
 const MAX_DECODE_ERRORS: usize = 3;
 
+pub type DecoderCallback = Box<dyn FnMut(AudioBuffer<f32>, Duration) + Send + 'static>;
+
 /// Like rodio's built-in `SymphoniaDecoder`, but also invokes the callback to
 /// keep the caller updated with the timestamp.
 pub struct TrackingSymphoniaDecoder {
@@ -29,7 +31,7 @@ pub struct TrackingSymphoniaDecoder {
     format: Box<dyn FormatReader>,
     buffer: SampleBuffer<i16>,
     spec: SignalSpec,
-    callback: Option<Box<dyn FnMut(AudioBuffer<f32>, Duration) + Send + 'static>>,
+    callback: Option<DecoderCallback>,
 }
 
 impl TrackingSymphoniaDecoder {

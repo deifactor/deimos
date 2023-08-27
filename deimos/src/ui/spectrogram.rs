@@ -5,6 +5,7 @@ use spectrum_analyzer::{
     samples_fft_to_spectrum, scaling::divide_by_N_sqrt, windows::hann_window, FrequencyLimit,
     FrequencySpectrum,
 };
+
 use symphonia::core::audio::{AudioBuffer, Signal};
 
 #[derive(Debug, Clone)]

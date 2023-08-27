@@ -4,7 +4,6 @@ pub mod search;
 pub mod spectrogram;
 pub mod track_list;
 
-
 use crossterm::event::KeyCode;
 use ratatui::{
     backend::CrosstermBackend,
