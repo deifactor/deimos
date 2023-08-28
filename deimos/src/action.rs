@@ -169,7 +169,7 @@ impl Command {
                         .fetch_all(&mut *conn)
                         .await?
                         .into_iter()
-                        .group_by(|track| track.album.clone().unwrap())
+                        .group_by(|track| track.album.clone().0.unwrap())
                         .into_iter()
                         .map(|(title, tracks)| (title, tracks.into_iter().collect_vec()))
                         .collect_vec();

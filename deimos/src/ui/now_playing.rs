@@ -31,7 +31,7 @@ impl NowPlaying {
         };
 
         let title = play_state.track.title.as_deref().unwrap_or("<unknown>");
-        let artist = play_state.track.artist.as_deref().unwrap_or("<unknown>");
+        let artist = format!("{}", play_state.track.artist);
 
         let chunks = Layout::default()
             .direction(Direction::Vertical)

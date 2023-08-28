@@ -4,11 +4,45 @@ use ordered_float::OrderedFloat;
 use sqlx::Connection;
 use sqlx::{sqlite::SqliteConnectOptions, Pool, Sqlite, SqlitePool, Transaction};
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use std::{fs::File, os::unix::prelude::OsStrExt, path::Path};
 use symphonia::core::formats::Track as SymphoniaTrack;
 use symphonia::core::io::MediaSourceStream;
 
 use walkdir::WalkDir;
+
+/// Stores information about the library as a whole.
+#[allow(dead_code)]
+pub struct Library {
+    pub artists: HashMap<ArtistId, Artist>,
+}
+
+// Intentionally *not* `Option<String>` so that we can support "Various Artists" later.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ArtistId {
+    Unknown,
+    Artist(String),
+}
+
+/// Information about an individual artist. We guarantee that `self.albums[name].artist ==
+/// self.name`.
+#[derive(Debug, Clone)]
+pub struct Artist {
+    pub id: ArtistId,
+    pub albums: HashMap<AlbumId, Album>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
+pub struct AlbumId(pub Option<String>);
+
+/// Information about an album from a single artist. We guarantee that `self.tracks[i].album ==
+/// self.name && self.tracks[i].artist == self.artist`.
+#[derive(Debug, Clone)]
+pub struct Album {
+    pub id: AlbumId,
+    pub artist: ArtistId,
+    pub tracks: Vec<Track>,
+}
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Track {
@@ -16,9 +50,36 @@ pub struct Track {
     pub number: Option<i64>,
     pub path: String,
     pub title: Option<String>,
-    pub album: Option<String>,
-    pub artist: Option<String>,
+    pub album: AlbumId,
+    pub artist: ArtistId,
     pub length: OrderedFloat<f64>,
+}
+
+impl Display for ArtistId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ArtistId::Unknown => "<unknown>".fmt(f),
+            ArtistId::Artist(name) => name.fmt(f),
+        }
+    }
+}
+
+impl From<Option<String>> for ArtistId {
+    fn from(value: Option<String>) -> Self {
+        value.map_or(ArtistId::Unknown, ArtistId::Artist)
+    }
+}
+
+impl From<Option<String>> for AlbumId {
+    fn from(value: Option<String>) -> Self {
+        AlbumId(value)
+    }
+}
+
+impl Display for AlbumId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.0.as_deref().unwrap_or("<unknown>").fmt(f)
+    }
 }
 
 /// Initialize the song database, creating all tables. This deletes any existing database.
