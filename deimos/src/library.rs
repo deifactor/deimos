@@ -1,18 +1,16 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use lofty::{Accessor, ItemKey, TaggedFileExt};
 use ordered_float::OrderedFloat;
-use sqlx::Connection;
-use sqlx::{sqlite::SqliteConnectOptions, Pool, Sqlite, SqlitePool, Transaction};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use std::{fs::File, os::unix::prelude::OsStrExt, path::Path};
-use symphonia::core::formats::Track as SymphoniaTrack;
+use std::path::PathBuf;
+use std::{fs::File, path::Path};
 use symphonia::core::io::MediaSourceStream;
 
 use walkdir::WalkDir;
 
 /// Stores information about the library as a whole.
-#[allow(dead_code)]
+#[derive(Debug, Clone, Default)]
 pub struct Library {
     pub artists: HashMap<ArtistId, Artist>,
 }
@@ -32,7 +30,16 @@ pub struct Artist {
     pub albums: HashMap<AlbumId, Album>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
+impl Artist {
+    pub fn new(id: ArtistId) -> Self {
+        Self {
+            id,
+            albums: HashMap::new(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord, Hash)]
 pub struct AlbumId(pub Option<String>);
 
 /// Information about an album from a single artist. We guarantee that `self.tracks[i].album ==
@@ -40,20 +47,115 @@ pub struct AlbumId(pub Option<String>);
 #[derive(Debug, Clone)]
 pub struct Album {
     pub id: AlbumId,
-    pub artist: ArtistId,
     pub tracks: Vec<Track>,
+}
+
+impl Album {
+    pub fn new(id: AlbumId) -> Self {
+        Self { id, tracks: vec![] }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Track {
-    pub song_id: i64,
-    pub number: Option<i64>,
-    pub path: String,
+    pub number: Option<u32>,
+    pub path: PathBuf,
     pub title: Option<String>,
     pub album: AlbumId,
     pub artist: ArtistId,
     pub length: OrderedFloat<f64>,
 }
+
+impl Library {
+    /// Scan the given path for music, initializing it as we go.
+    pub fn scan(path: impl AsRef<Path>) -> Result<Self> {
+        let mut library = Self::default();
+
+        for entry in WalkDir::new(path)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_type().is_file())
+        {
+            if let Ok(track) = Track::from_path(entry.path()) {
+                library.insert_track(track)?;
+            }
+        }
+        Ok(library)
+    }
+
+    fn insert_track(&mut self, track: Track) -> Result<()> {
+        let tracks = &mut self
+            .artists
+            .entry(track.artist.clone())
+            .or_insert_with_key(|id| Artist::new(id.clone()))
+            .albums
+            .entry(track.album.clone())
+            .or_insert_with_key(|id| Album::new(id.clone()))
+            .tracks;
+        tracks.push(track);
+        tracks.sort_by_key(|track| track.number);
+        Ok(())
+    }
+}
+
+/// Handy iterators.
+impl Library {
+    pub fn artists(&self) -> impl Iterator<Item = &Artist> {
+        self.artists.values()
+    }
+
+    pub fn albums_with_artist(&self) -> impl Iterator<Item = (&Album, &Artist)> {
+        self.artists()
+            .flat_map(|artist| artist.albums.values().map(move |album| (album, artist)))
+    }
+
+    pub fn albums(&self) -> impl Iterator<Item = &Album> {
+        self.albums_with_artist().map(|(album, _)| album)
+    }
+
+    pub fn tracks(&self) -> impl Iterator<Item = &Track> {
+        self.albums().flat_map(|album| album.tracks.iter())
+    }
+}
+
+impl Track {
+    pub fn from_path(path: &Path) -> Result<Self> {
+        let probe = symphonia::default::get_probe();
+
+        let file = File::open(path)?;
+        let media_source = MediaSourceStream::new(Box::new(file), Default::default());
+        let probed = probe.format(
+            &Default::default(),
+            media_source,
+            &Default::default(),
+            &Default::default(),
+        )?;
+        let stream = probed
+            .format
+            .default_track()
+            .context("couldn't find a default track")?;
+
+        let tagged_file = lofty::read_from_path(path)?;
+        let tag = tagged_file.primary_tag().context("no tags found")?;
+        let artist = tag
+            .get_string(&ItemKey::AlbumArtist)
+            .or(tag.get_string(&ItemKey::TrackArtist));
+        let time_base = stream.codec_params.time_base.unwrap();
+        let duration = time_base.calc_time(stream.codec_params.n_frames.unwrap());
+        let duration = duration.seconds as f64 + duration.frac;
+
+        Ok(Self {
+            number: tag.track(),
+            path: path.to_owned(),
+            title: tag.title().map(|s| s.into_owned()),
+            album: tag.album().map(|s| s.into_owned()).into(),
+            artist: artist.map(|s| s.to_owned()).into(),
+            length: duration.into(),
+        })
+    }
+}
+
+// miscellaneous impls
 
 impl Display for ArtistId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -70,111 +172,14 @@ impl From<Option<String>> for ArtistId {
     }
 }
 
-impl From<Option<String>> for AlbumId {
-    fn from(value: Option<String>) -> Self {
-        AlbumId(value)
-    }
-}
-
 impl Display for AlbumId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.0.as_deref().unwrap_or("<unknown>").fmt(f)
     }
 }
 
-/// Initialize the song database, creating all tables. This deletes any existing database.
-pub async fn initialize_db(path: impl AsRef<Path>) -> Result<Pool<Sqlite>> {
-    let pool = SqlitePool::connect_with(
-        SqliteConnectOptions::new()
-            .filename(path)
-            .create_if_missing(true),
-    )
-    .await?;
-    let mut conn = pool.acquire().await?;
-    sqlx::migrate!().run(&mut conn).await?;
-    Ok(pool)
-}
-
-async fn find_music(path: impl AsRef<Path>, conn: &mut Transaction<'_, Sqlite>) -> Result<()> {
-    let probe = symphonia::default::get_probe();
-    for entry in WalkDir::new(path)
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().is_file())
-    {
-        let file = File::open(entry.path())?;
-        let media_source = MediaSourceStream::new(Box::new(file), Default::default());
-        let probed = probe.format(
-            &Default::default(),
-            media_source,
-            &Default::default(),
-            &Default::default(),
-        );
-        let Ok(probed) = probed else { continue; };
-        let stream = match probed.format.default_track() {
-            Some(stream) => stream,
-            None => bail!("couldn't find a default track"),
-        };
-        let _ = insert_song(entry.path(), stream, conn).await;
+impl From<Option<String>> for AlbumId {
+    fn from(value: Option<String>) -> Self {
+        AlbumId(value)
     }
-    Ok(())
-}
-
-async fn insert_song(
-    path: &Path,
-    stream: &SymphoniaTrack,
-    conn: &mut Transaction<'_, Sqlite>,
-) -> Result<()> {
-    let tagged_file = lofty::read_from_path(path)?;
-    let tag = tagged_file.primary_tag().context("no tags found")?.clone();
-    let path_bytes = path.as_os_str().as_bytes();
-    let track = tag.track();
-    let title = tag.title();
-    let album = tag.album();
-    let artist = tag
-        .get_string(&ItemKey::AlbumArtist)
-        .or(tag.get_string(&ItemKey::TrackArtist));
-    let time_base = stream.codec_params.time_base.unwrap();
-    let duration = time_base.calc_time(stream.codec_params.n_frames.unwrap());
-    let duration = duration.seconds as f64 + duration.frac;
-    sqlx::query!(
-        "INSERT INTO songs (path, number, title, album, artist, length) VALUES (?, ?, ?, ?, ?, ?)",
-        path_bytes,
-        track,
-        title,
-        album,
-        artist,
-        duration
-    )
-    .execute(&mut **conn)
-    .await?;
-    Ok(())
-}
-
-/// Performs the initial library load. Returns a map from artist names to their albums.
-pub async fn load_library(
-    pool: &Pool<Sqlite>,
-) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
-    let mut conn = pool.acquire().await?;
-    let count = sqlx::query!("SELECT COUNT(*) AS count FROM songs")
-        .fetch_one(&mut *conn)
-        .await?
-        .count;
-    if count == 0 {
-        conn.transaction(|conn| {
-            Box::pin(async move { find_music("/home/vector/music", conn).await })
-        })
-        .await?;
-    }
-    let mut artists: HashMap<String, Vec<String>> = HashMap::new();
-    sqlx::query!(
-        r#"SELECT DISTINCT artist AS "artist!", album AS "album!"
-                       FROM songs WHERE artist IS NOT NULL AND album IS NOT NULL
-                       ORDER BY artist, album"#
-    )
-    .fetch_all(&mut *conn)
-    .await?
-    .into_iter()
-    .for_each(|row| artists.entry(row.artist).or_default().push(row.album));
-    Ok(artists)
 }

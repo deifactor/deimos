@@ -136,7 +136,7 @@ impl Component for TrackList {
             KeyCode::Enter => {
                 return self
                     .selected()
-                    .map(|track| Command::PlayTrack(track.song_id))
+                    .map(|track| Command::PlayTrack(track.clone()))
             }
             _ => (),
         }

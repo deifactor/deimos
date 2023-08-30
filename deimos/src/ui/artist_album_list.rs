@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use anyhow::{anyhow, Result};
 use crossterm::event::KeyCode;
@@ -12,6 +12,7 @@ use ratatui::{
 
 use crate::{
     action::Command,
+    library::{AlbumId, ArtistId, Library},
     ui::{Component, DeimosBackend, Ui},
 };
 
@@ -19,8 +20,8 @@ use super::ActiveState;
 
 #[derive(Debug)]
 struct ArtistItem {
-    artist: String,
-    albums: Vec<String>,
+    artist: ArtistId,
+    albums: Vec<AlbumId>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -51,10 +52,17 @@ pub struct ArtistAlbumList {
 
 /// Methods for manipulating the state
 impl ArtistAlbumList {
-    pub fn new(artists: HashMap<String, Vec<String>>) -> Self {
-        let mut artists = artists
-            .into_iter()
-            .map(|(artist, albums)| ArtistItem { artist, albums })
+    pub fn new(library: &Library) -> Self {
+        let mut artists = library
+            .artists()
+            .map(|artist| {
+                let mut albums = artist.albums.keys().cloned().collect_vec();
+                albums.sort_unstable();
+                ArtistItem {
+                    artist: artist.id.clone(),
+                    albums,
+                }
+            })
             .collect_vec();
         artists.sort_unstable_by_key(|item| item.artist.clone());
         let mut list = Self {
@@ -66,12 +74,12 @@ impl ArtistAlbumList {
         list
     }
 
-    pub fn artist(&self) -> Option<String> {
+    pub fn artist(&self) -> Option<ArtistId> {
         let idx = self.selected?;
         Some(self.artists[self.rows[idx].artist].artist.clone())
     }
 
-    pub fn album(&self) -> Option<String> {
+    pub fn album(&self) -> Option<AlbumId> {
         let idx = self.selected?;
         let artist = self.rows[idx].artist;
         let album = self.rows[idx].album?;
@@ -129,18 +137,18 @@ impl ArtistAlbumList {
 
     /// Move the selection to the given artist (and optionally album),
     /// expanding it if they aren't already. Errors if that artist/album does not exist.
-    pub fn select(&mut self, artist: &str, album: Option<&str>) -> Result<()> {
+    pub fn select(&mut self, artist: &ArtistId, album: Option<&AlbumId>) -> Result<()> {
         // XXX: linear scanning is inefficient!
         let (artist_index, item) = self
             .artists
             .iter()
-            .find_position(|item| item.artist == artist)
+            .find_position(|item| &item.artist == artist)
             .ok_or_else(|| anyhow!("couldn't find {artist}"))?;
         let album_index = album
             .map(|album| {
                 item.albums
                     .iter()
-                    .position(|val| val.as_str() == album)
+                    .position(|val| val == album)
                     .ok_or_else(|| anyhow!("couldn't find {album} for {artist}"))
             })
             .transpose()?;
@@ -169,7 +177,7 @@ impl ArtistAlbumList {
         let artist = &self.artists[row.artist];
         match row.album {
             Some(album) => format!("    {}", artist.albums[album]),
-            None => artist.artist.clone(),
+            None => format!("{}", artist.artist),
         }
     }
 

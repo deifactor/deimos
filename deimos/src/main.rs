@@ -5,7 +5,7 @@ mod library;
 mod library_panel;
 mod ui;
 
-use std::{io, panic};
+use std::{io, panic, path::PathBuf};
 
 use anyhow::Result;
 use app::App;
@@ -14,8 +14,8 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use library::initialize_db;
 
+use library::Library;
 use ratatui::{backend::CrosstermBackend, Terminal};
 
 use rodio::{OutputStream, Sink};
@@ -24,7 +24,7 @@ use tokio_stream::StreamExt;
 #[tokio::main]
 async fn main() -> Result<()> {
     let terminal = prepare_terminal()?;
-    let pool = initialize_db("songs.sqlite").await?;
+    let library = Library::scan(PathBuf::from("/home/vector/music"))?;
 
     let app = App::default();
 
@@ -32,7 +32,7 @@ async fn main() -> Result<()> {
     let sink = Sink::try_new(&output_stream_handle)?;
 
     app.run(
-        pool,
+        library,
         sink,
         EventStream::new().filter_map(|ev| ev.ok()),
         terminal,

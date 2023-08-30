@@ -6,14 +6,10 @@
 /// - We don't have to box them all the time (performance doesn't matter, but it's verbose)
 /// - We can make their methods take them by move (can't call a by-move method on a boxed trait object)
 /// - Less verbose to declare a new action
-use std::collections::HashMap;
-
 use anyhow::Result;
 
-use async_recursion::async_recursion;
 use itertools::Itertools;
 use rodio::Sink;
-use sqlx::{Connection, Pool, Sqlite};
 
 use symphonia::core::audio::AudioBuffer;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
@@ -21,9 +17,8 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use crate::{
     app::{App, Mode},
     decoder::TrackingSymphoniaDecoder,
-    library::{self, Track},
+    library::{AlbumId, ArtistId, Library, Track},
     ui::{
-        artist_album_list::ArtistAlbumList,
         now_playing::PlayState,
         search::{Search, SearchResult},
         track_list::{TrackList, TrackListItem},
@@ -39,7 +34,6 @@ use crate::{
 /// - it's in a [`Command::execute`] implementation, which doesn't
 /// have a reference to the app state at all
 pub enum Action {
-    SetArtists(HashMap<String, Vec<String>>),
     SetTracks(Vec<Track>),
     SetTracksMultiAlbum(Vec<(String, Vec<Track>)>),
     SetNowPlaying(Option<PlayState>),
@@ -53,9 +47,6 @@ impl Action {
     pub fn dispatch(self, app: &mut App) -> Result<Option<Command>> {
         use Action::*;
         match self {
-            SetArtists(artists) => {
-                app.library_panel.artist_album_list = ArtistAlbumList::new(artists)
-            }
             SetTracks(tracks) => {
                 app.library_panel.track_list =
                     TrackList::new(tracks.into_iter().map(TrackListItem::Track).collect())
@@ -102,12 +93,11 @@ impl Action {
 /// database should both be done through a [`Command`], and the artist/album
 /// tree browser needs to send a command to update the track list.
 pub enum Command {
-    LoadLibrary,
     LoadTracks {
-        artist: String,
-        album: Option<String>,
+        artist: ArtistId,
+        album: Option<AlbumId>,
     },
-    PlayTrack(i64),
+    PlayTrack(Track),
     Search {
         query: String,
     },
@@ -119,71 +109,40 @@ pub enum Command {
 }
 
 impl Command {
-    #[async_recursion]
-    async fn execute(
+    fn execute(
         self,
-        pool: &Pool<Sqlite>,
+        library: &Library,
         sink: &Sink,
         tx_action: &UnboundedSender<Action>,
     ) -> Result<Option<Action>> {
         let action = match self {
             Command::Sequence(actions) => {
                 for cmd in actions {
-                    let action = cmd.execute(pool, sink, tx_action).await?;
+                    let action = cmd.execute(library, sink, tx_action)?;
                     if let Some(action) = action {
                         tx_action.send(action)?;
                     }
                 }
                 None
             }
-            Command::LoadLibrary => {
-                let artists = library::load_library(pool).await?;
-                Some(Action::SetArtists(artists))
-            }
 
-            Command::LoadTracks { artist, album } => {
-                let mut conn = pool.acquire().await?;
-                match album {
-                    Some(album) => {
-                        // just load the tracks for that album
-                        let tracks = sqlx::query_as!(
-                            Track,
-                            r#"SELECT *
-                               FROM songs WHERE artist = ? AND album = ?
-                               ORDER BY number ASC NULLS FIRST"#,
-                            artist,
-                            album
-                        )
-                        .fetch_all(&mut *conn)
-                        .await?;
-                        Some(Action::SetTracks(tracks))
-                    }
-                    None => {
-                        let tracks = sqlx::query_as!(
-                            Track,
-                            r#"SELECT *
-                            FROM songs WHERE artist = ? AND album IS NOT NULL
-                            ORDER BY album, number ASC"#,
-                            artist
-                        )
-                        .fetch_all(&mut *conn)
-                        .await?
-                        .into_iter()
-                        .group_by(|track| track.album.clone().0.unwrap())
-                        .into_iter()
-                        .map(|(title, tracks)| (title, tracks.into_iter().collect_vec()))
-                        .collect_vec();
-                        Some(Action::SetTracksMultiAlbum(tracks))
-                    }
+            Command::LoadTracks { artist, album } => match album {
+                Some(album) => {
+                    let tracks = library.artists[&artist].albums[&album].tracks.clone();
+                    Some(Action::SetTracks(tracks))
                 }
-            }
+                None => {
+                    let mut tracks = library.artists[&artist]
+                        .albums
+                        .iter()
+                        .map(|(id, album)| (format!("{}", id), album.tracks.clone()))
+                        .collect_vec();
+                    tracks.sort_unstable_by_key(|(id, _)| id.clone());
+                    Some(Action::SetTracksMultiAlbum(tracks))
+                }
+            },
 
-            Command::PlayTrack(song_id) => {
-                let mut conn = pool.acquire().await?;
-                let track =
-                    sqlx::query_as!(Track, "SELECT * FROM songs WHERE song_id = ?", song_id)
-                        .fetch_one(&mut *conn)
-                        .await?;
+            Command::PlayTrack(track) => {
                 let tx_action = tx_action.clone();
                 let decoder = TrackingSymphoniaDecoder::from_path(&track.path)?.with_callback(
                     move |buffer, timestamp| {
@@ -203,12 +162,7 @@ impl Command {
             }
 
             Command::Search { query } => {
-                let mut conn = pool.acquire().await?;
-                let results = conn
-                    .transaction(|tx| {
-                        Box::pin(async move { Search::run_search_query(&query, tx).await })
-                    })
-                    .await?;
+                let results = Search::run_search_query(library, query)?;
                 Some(Action::SetSearchResults(results))
             }
 
@@ -221,14 +175,14 @@ impl Command {
 
     /// Spawns an executor task that will forever execute any commands sent via the returned command sender.
     pub fn spawn_executor(
-        pool: Pool<Sqlite>,
+        library: Library,
         sink: Sink,
         send_action: UnboundedSender<Action>,
     ) -> UnboundedSender<Command> {
         let (tx_cmd, mut rx_cmd) = unbounded_channel::<Command>();
         tokio::spawn(async move {
             while let Some(command) = rx_cmd.recv().await {
-                if let Some(action) = command.execute(&pool, &sink, &send_action).await.unwrap() {
+                if let Some(action) = command.execute(&library, &sink, &send_action).unwrap() {
                     send_action.send(action).unwrap();
                 }
             }

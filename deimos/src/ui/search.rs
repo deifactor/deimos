@@ -7,9 +7,11 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame,
 };
-use sqlx::{Sqlite, Transaction};
 
-use crate::action::{Action, Command};
+use crate::{
+    action::{Action, Command},
+    library::{AlbumId, ArtistId, Library, Track},
+};
 
 use super::{ActiveState, Component, DeimosBackend};
 
@@ -18,37 +20,31 @@ use super::{ActiveState, Component, DeimosBackend};
 /// Things that match the search.
 #[derive(Debug, Clone)]
 pub enum SearchResult {
-    Artist(String),
-    Album {
-        name: String,
-        album_artist: String,
-    },
-    Track {
-        name: String,
-        album_artist: String,
-        album: String,
-    },
+    Artist(ArtistId),
+    Album(AlbumId, ArtistId),
+    Track(Track),
 }
+
 impl SearchResult {
-    pub fn album_artist(&self) -> &str {
+    pub fn album_artist(&self) -> &ArtistId {
         match self {
             SearchResult::Artist(artist) => artist,
-            SearchResult::Album { album_artist, .. } => album_artist.as_str(),
-            SearchResult::Track { album_artist, .. } => album_artist.as_str(),
+            SearchResult::Album(_, artist) => artist,
+            SearchResult::Track(track) => &track.artist,
         }
     }
 
-    pub fn album(&self) -> Option<&str> {
+    pub fn album(&self) -> Option<&AlbumId> {
         match self {
             SearchResult::Artist(_) => None,
-            SearchResult::Album { name, .. } => Some(name.as_str()),
-            SearchResult::Track { album, .. } => Some(album.as_str()),
+            SearchResult::Album(album, _) => Some(album),
+            SearchResult::Track(track) => Some(&track.album),
         }
     }
 
     pub fn track_title(&self) -> Option<&str> {
         match self {
-            SearchResult::Track { name, .. } => Some(name.as_str()),
+            SearchResult::Track(track) => track.title.as_deref(),
             _ => None,
         }
     }
@@ -67,67 +63,47 @@ impl Search {
 
     fn render_result(&self, track: &SearchResult) -> ListItem<'static> {
         match track {
-            SearchResult::Artist(artist) => ListItem::new(artist.clone()),
-            SearchResult::Album { name, album_artist } => {
-                ListItem::new(format!("{name} - {album_artist}"))
-            }
-            SearchResult::Track {
-                name,
-                album_artist,
-                album,
-            } => ListItem::new(format!("{name} - {album_artist} - {album}")),
+            SearchResult::Artist(artist) => ListItem::new(format!("{}", artist)),
+            SearchResult::Album(album, artist) => ListItem::new(format!("{} - {}", album, artist)),
+            SearchResult::Track(track) => ListItem::new(format!(
+                "{} - {} - {}",
+                track.title.as_deref().unwrap_or("<unknown>"),
+                track.album,
+                track.artist,
+            )),
         }
     }
 
-    pub async fn run_search_query(
+    pub fn run_search_query(
+        library: &Library,
         query: impl AsRef<str>,
-        conn: &mut Transaction<'_, Sqlite>,
     ) -> Result<Vec<SearchResult>> {
-        let query = format!("%{}%", query.as_ref());
-        let mut results = vec![];
-        results.extend(
-            sqlx::query_scalar!(
-                r#"SELECT DISTINCT artist AS "artist!" FROM songs
-                WHERE artist LIKE ? AND artist IS NOT NULL
-                ORDER BY artist"#,
-                query,
-            )
-            .fetch_all(&mut **conn)
-            .await?
-            .into_iter()
-            .map(SearchResult::Artist),
-        );
-        results.extend(
-            sqlx::query!(
-                r#"SELECT DISTINCT artist AS "artist!", album AS "album!" FROM songs
-                WHERE album LIKE ? AND artist IS NOT NULL AND album IS NOT NULL
-                ORDER BY album, artist"#,
-                query
-            )
-            .fetch_all(&mut **conn)
-            .await?
-            .into_iter()
-            .map(|rec| SearchResult::Album {
-                name: rec.album,
-                album_artist: rec.artist,
-            }),
-        );
-        results.extend(
-            sqlx::query!(
-                r#"SELECT DISTINCT artist AS "artist!", album AS "album!", title AS "title!" FROM songs
-                WHERE title LIKE ? 
-                AND artist IS NOT NULL AND album IS NOT NULL AND title IS NOT NULL
-                ORDER BY title, album, artist"#,
-                query
-            )
-            .fetch_all(&mut **conn)
-            .await?
-            .into_iter()
-            .map(|rec| SearchResult::Track {
-                name: rec.title,
-                album_artist: rec.artist,
-                album: rec.album,
-            }));
+        let query = query.as_ref();
+        // XXX: this isn't right. use regex
+        let is_match = |haystack: &String| haystack.to_lowercase().contains(&query.to_lowercase());
+        let artists = library
+            .artists()
+            .map(|a| &a.id)
+            .filter(|id| match id {
+                ArtistId::Unknown => false,
+                ArtistId::Artist(name) => is_match(name),
+            })
+            .cloned()
+            .map(SearchResult::Artist);
+
+        let albums = library
+            .albums_with_artist()
+            .filter(|(album, _)| album.id.0.as_ref().map_or(false, is_match))
+            .map(|(album, artist)| SearchResult::Album(album.id.clone(), artist.id.clone()));
+
+        let tracks = library
+            .tracks()
+            .filter(|track| track.title.as_ref().map_or(false, is_match))
+            .cloned()
+            .map(SearchResult::Track);
+
+        let results = artists.chain(albums).chain(tracks).collect_vec();
+
         Ok(results)
     }
 

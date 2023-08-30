@@ -5,16 +5,16 @@ use ratatui::{
     Frame, Terminal,
 };
 use rodio::Sink;
-use sqlx::{Pool, Sqlite};
 use tokio::{pin, sync::mpsc::unbounded_channel};
 use tokio_stream::{Stream, StreamExt};
 
 use crate::{
     action::{Action, Command},
+    library::Library,
     library_panel::LibraryPanel,
     ui::{
-        now_playing::NowPlaying, search::Search, spectrogram::Visualizer, Component, DeimosBackend,
-        Ui,
+        artist_album_list::ArtistAlbumList, now_playing::NowPlaying, search::Search,
+        spectrogram::Visualizer, Component, DeimosBackend, Ui,
     },
 };
 
@@ -38,14 +38,15 @@ pub struct App {
 impl App {
     pub async fn run(
         mut self,
-        pool: Pool<Sqlite>,
+        library: Library,
         sink: Sink,
         terminal_events: impl Stream<Item = Event> + Send + Sync + 'static,
         mut terminal: Terminal<DeimosBackend>,
     ) -> Result<()> {
+        self.library_panel.artist_album_list = ArtistAlbumList::new(&library);
+
         let (tx_action, mut rx_action) = unbounded_channel::<Action>();
-        let sender = Command::spawn_executor(pool.clone(), sink, tx_action.clone());
-        sender.send(Command::LoadLibrary)?;
+        let sender = Command::spawn_executor(library, sink, tx_action.clone());
         pin!(terminal_events);
 
         loop {
