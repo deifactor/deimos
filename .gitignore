@@ -1,5 +1,3 @@
 /target
 **/*.rs.bk
 /.direnv
-dev.sqlite*
-*.sqlite*

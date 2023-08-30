@@ -25,9 +25,6 @@
             alsa-lib
             ncurses
             openssl
-
-            sqlite-interactive
-            sqlx-cli
           ];
         };
       }
