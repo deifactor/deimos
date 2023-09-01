@@ -28,8 +28,9 @@ pub enum Mode {
     Search,
 }
 
-#[derive(Debug, Default)]
 pub struct App {
+    pub library: Library,
+    pub player_sink: Sink,
     pub library_panel: LibraryPanel,
     pub now_playing: NowPlaying,
     pub visualizer: Visualizer,
@@ -40,14 +41,26 @@ pub struct App {
 }
 
 impl App {
+    pub fn new(library: Library, player_sink: Sink) -> Self {
+        Self {
+            library,
+            player_sink,
+            library_panel: LibraryPanel::default(),
+            now_playing: NowPlaying::default(),
+            visualizer: Visualizer::default(),
+            search: Search::default(),
+            mode: Mode::Play,
+            ui: Ui::default(),
+            should_quit: false,
+        }
+    }
+
     pub async fn run(
         mut self,
-        library: Library,
-        sink: Sink,
         terminal_events: impl Stream<Item = Event> + Send + Sync + 'static,
         mut terminal: Terminal<DeimosBackend>,
     ) -> Result<()> {
-        self.library_panel.artist_album_list = ArtistAlbumList::new(&library);
+        self.library_panel.artist_album_list = ArtistAlbumList::new(&self.library);
 
         let (tx_action, rx_action) = unbounded_channel::<Action>();
         pin!(terminal_events);
@@ -55,7 +68,7 @@ impl App {
         let mut event_stream = AppEvent::stream(terminal_events, rx_action);
 
         while let Some(event) = event_stream.next().await {
-            self.handle_event(event, &library, &sink, &tx_action)?;
+            self.handle_event(event, &tx_action)?;
             terminal.draw(|f| self.draw(f).expect("failed to rerender app"))?;
             if self.should_quit {
                 return Ok(());
@@ -69,31 +82,25 @@ impl App {
         self.should_quit = true;
     }
 
-    fn handle_event(
-        &mut self,
-        event: AppEvent,
-        library: &Library,
-        sink: &Sink,
-        tx_action: &UnboundedSender<Action>,
-    ) -> Result<()> {
+    fn handle_event(&mut self, event: AppEvent, tx_action: &UnboundedSender<Action>) -> Result<()> {
         let action = match event {
             AppEvent::Terminal(terminal_event) => {
                 if let Some(command) = self.handle_terminal(terminal_event) {
-                    command.execute(library, sink, tx_action)?
+                    command.execute(&self.library, &self.player_sink, tx_action)?
                 } else {
                     None
                 }
             }
             AppEvent::Action(action) => {
                 if let Some(command) = action.dispatch(self)? {
-                    command.execute(library, sink, tx_action)?
+                    command.execute(&self.library, &self.player_sink, tx_action)?
                 } else {
                     None
                 }
             }
         };
         if let Some(action) = action {
-            self.handle_event(AppEvent::Action(action), library, sink, tx_action)?;
+            self.handle_event(AppEvent::Action(action), tx_action)?;
         }
         Ok(())
     }

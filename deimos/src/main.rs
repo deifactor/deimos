@@ -26,18 +26,12 @@ async fn main() -> Result<()> {
     let terminal = prepare_terminal()?;
     let library = Library::scan(PathBuf::from("/home/vector/music"))?;
 
-    let app = App::default();
-
     let (_output_stream, output_stream_handle) = OutputStream::try_default()?;
     let sink = Sink::try_new(&output_stream_handle)?;
+    let app = App::new(library, sink);
 
-    app.run(
-        library,
-        sink,
-        EventStream::new().filter_map(|ev| ev.ok()),
-        terminal,
-    )
-    .await?;
+    app.run(EventStream::new().filter_map(|ev| ev.ok()), terminal)
+        .await?;
 
     restore_terminal()?;
 
