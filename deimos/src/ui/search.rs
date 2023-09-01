@@ -155,9 +155,7 @@ impl Component for Search {
             _ => (),
         };
         if old_query != self.query {
-            Some(Command::Search {
-                query: self.query.clone(),
-            })
+            Some(Command::RunAction(Action::RunSearch(self.query.clone())))
         } else {
             None
         }

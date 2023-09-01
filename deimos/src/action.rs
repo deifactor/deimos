@@ -34,116 +34,75 @@ use crate::{
 /// - it's in a [`Command::execute`] implementation, which doesn't
 /// have a reference to the app state at all
 pub enum Action {
-    SetTracks(Vec<Track>),
-    SetTracksMultiAlbum(Vec<(String, Vec<Track>)>),
+    LibraryTreeItemSelected {
+        artist: ArtistId,
+        album: Option<AlbumId>,
+    },
     SetNowPlaying(Option<PlayState>),
     UpdateSpectrum(AudioBuffer<f32>),
-    SetSearchResults(Vec<SearchResult>),
+    RunSearch(String),
     SelectEntity(SearchResult),
     SelectEntityTracksLoaded(String),
+    PlayTrack(Track),
     Quit,
 }
 
 impl Action {
-    pub fn dispatch(self, app: &mut App) -> Result<Option<Command>> {
+    pub fn dispatch(
+        self,
+        app: &mut App,
+        tx_action: &UnboundedSender<Action>,
+    ) -> Result<Option<Command>> {
         use Action::*;
         match self {
-            SetTracks(tracks) => {
-                app.library_panel.track_list =
-                    TrackList::new(tracks.into_iter().map(TrackListItem::Track).collect())
-            }
-            SetTracksMultiAlbum(albums) => {
-                app.library_panel.track_list = TrackList::new(
-                    albums
-                        .into_iter()
-                        .flat_map(|(title, tracks)| {
-                            std::iter::once(TrackListItem::Section(title))
-                                .chain(tracks.into_iter().map(TrackListItem::Track))
-                        })
-                        .collect(),
-                )
-            }
-            SetNowPlaying(play_state) => app.now_playing.play_state = play_state,
-            UpdateSpectrum(buf) => {
-                app.visualizer.update_spectrum(buf).unwrap();
-            }
-            SetSearchResults(results) => app.search.set_results(results),
-            SelectEntity(result) => {
-                app.mode = Mode::Play;
-                app.library_panel.select_entity(&result);
-                if let Some(cmd) = app.library_panel.artist_album_list.load_tracks_command() {
-                    if let Some(title) = result.track_title() {
-                        return Ok(Some(Command::Sequence(vec![
-                            cmd,
-                            Command::RunAction(SelectEntityTracksLoaded(title.to_owned())),
-                        ])));
-                    } else {
-                        return Ok(Some(cmd));
-                    }
-                }
-            }
-            SelectEntityTracksLoaded(title) => app.library_panel.track_list.select(&title),
-            Quit => app.quit(),
-        }
-        Ok(None)
-    }
-}
-
-/// A [`Command`] is the way for components to either talk to the external
-/// world a nonblocking way or apply a global mutation to the application
-/// state. For example, downloading data from the internet and talking to the
-/// database should both be done through a [`Command`], and the artist/album
-/// tree browser needs to send a command to update the track list.
-pub enum Command {
-    LoadTracks {
-        artist: ArtistId,
-        album: Option<AlbumId>,
-    },
-    PlayTrack(Track),
-    Search {
-        query: String,
-    },
-    RunAction(Action),
-    /// Perform these commands in sequence. All commands are executed in
-    /// sequence and then their actions are applied.
-    Sequence(Vec<Command>),
-}
-
-impl Command {
-    pub fn execute(
-        self,
-        library: &Library,
-        sink: &Sink,
-        tx_action: &UnboundedSender<Action>,
-    ) -> Result<Option<Action>> {
-        let action = match self {
-            Command::Sequence(actions) => {
-                for cmd in actions {
-                    let action = cmd.execute(library, sink, tx_action)?;
-                    if let Some(action) = action {
-                        tx_action.send(action)?;
-                    }
-                }
-                None
-            }
-
-            Command::LoadTracks { artist, album } => match album {
+            LibraryTreeItemSelected { artist, album } => match album {
                 Some(album) => {
-                    let tracks = library.artists[&artist].albums[&album].tracks.clone();
-                    Some(Action::SetTracks(tracks))
+                    let tracks = app.library.artists[&artist].albums[&album].tracks.clone();
+                    app.library_panel.track_list =
+                        TrackList::new(tracks.into_iter().map(TrackListItem::Track).collect());
                 }
                 None => {
-                    let mut tracks = library.artists[&artist]
+                    let mut albums = app.library.artists[&artist]
                         .albums
                         .iter()
                         .map(|(id, album)| (format!("{}", id), album.tracks.clone()))
                         .collect_vec();
-                    tracks.sort_unstable_by_key(|(id, _)| id.clone());
-                    Some(Action::SetTracksMultiAlbum(tracks))
+                    albums.sort_unstable_by_key(|(id, _)| id.clone());
+                    app.library_panel.track_list = TrackList::new(
+                        albums
+                            .into_iter()
+                            .flat_map(|(title, tracks)| {
+                                std::iter::once(TrackListItem::Section(title))
+                                    .chain(tracks.into_iter().map(TrackListItem::Track))
+                            })
+                            .collect(),
+                    );
                 }
             },
-
-            Command::PlayTrack(track) => {
+            SetNowPlaying(play_state) => app.now_playing.play_state = play_state,
+            UpdateSpectrum(buf) => {
+                app.visualizer.update_spectrum(buf).unwrap();
+            }
+            RunSearch(query) => {
+                let results = Search::run_search_query(&app.library, query)?;
+                app.search.set_results(results);
+            }
+            SelectEntity(result) => {
+                app.mode = Mode::Play;
+                app.library_panel.select_entity(&result);
+                LibraryTreeItemSelected {
+                    artist: result.album_artist().clone(),
+                    album: result.album().cloned(),
+                }
+                .dispatch(app, tx_action)?;
+                if let Some(title) = result.track_title() {
+                    return Ok(Some(Command::RunAction(SelectEntityTracksLoaded(
+                        title.to_owned(),
+                    ))));
+                }
+            }
+            SelectEntityTracksLoaded(title) => app.library_panel.track_list.select(&title),
+            PlayTrack(track) => {
                 let tx_action = tx_action.clone();
                 let decoder = TrackingSymphoniaDecoder::from_path(&track.path)?.with_callback(
                     move |buffer, timestamp| {
@@ -156,17 +115,33 @@ impl Command {
                         tx_action.send(Action::UpdateSpectrum(buffer)).unwrap();
                     },
                 );
-                sink.stop();
-                sink.append(decoder);
-                sink.play();
-                None
+                app.player_sink.stop();
+                app.player_sink.append(decoder);
+                app.player_sink.play();
             }
+            Quit => app.quit(),
+        }
+        Ok(None)
+    }
+}
 
-            Command::Search { query } => {
-                let results = Search::run_search_query(library, query)?;
-                Some(Action::SetSearchResults(results))
-            }
+/// A [`Command`] is the way for components to either talk to the external
+/// world a nonblocking way or apply a global mutation to the application
+/// state. For example, downloading data from the internet and talking to the
+/// database should both be done through a [`Command`], and the artist/album
+/// tree browser needs to send a command to update the track list.
+pub enum Command {
+    RunAction(Action),
+}
 
+impl Command {
+    pub fn execute(
+        self,
+        _library: &Library,
+        _sink: &Sink,
+        _tx_action: &UnboundedSender<Action>,
+    ) -> Result<Option<Action>> {
+        let action = match self {
             Command::RunAction(action) => Some(action),
         };
         Ok(action)

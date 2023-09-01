@@ -92,7 +92,7 @@ impl App {
                 }
             }
             AppEvent::Action(action) => {
-                if let Some(command) = action.dispatch(self)? {
+                if let Some(command) = action.dispatch(self, tx_action)? {
                     command.execute(&self.library, &self.player_sink, tx_action)?
                 } else {
                     None

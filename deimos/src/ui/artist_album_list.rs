@@ -11,7 +11,7 @@ use ratatui::{
 };
 
 use crate::{
-    action::Command,
+    action::{Action::LibraryTreeItemSelected, Command},
     library::{AlbumId, ArtistId, Library},
     ui::{Component, DeimosBackend, Ui},
 };
@@ -163,9 +163,11 @@ impl ArtistAlbumList {
 
     /// Command to dispatch to load the tracks for this album.
     pub fn load_tracks_command(&self) -> Option<Command> {
-        self.artist().map(|artist| Command::LoadTracks {
-            artist,
-            album: self.album(),
+        self.artist().map(|artist| {
+            Command::RunAction(LibraryTreeItemSelected {
+                artist,
+                album: self.album(),
+            })
         })
     }
 }
