@@ -9,7 +9,7 @@ use ratatui::{
 };
 
 use crate::{
-    action::{Action, Command},
+    action::Action,
     library::Track,
     ui::{Component, DeimosBackend, Ui},
 };
@@ -129,14 +129,14 @@ impl TrackList {
 }
 
 impl Component for TrackList {
-    fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Command> {
+    fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Action> {
         match keycode {
             KeyCode::Up => self.move_selection(-1),
             KeyCode::Down => self.move_selection(1),
             KeyCode::Enter => {
                 return self
                     .selected()
-                    .map(|track| Command::RunAction(Action::PlayTrack(track.clone())))
+                    .map(|track| Action::PlayTrack(track.clone()))
             }
             _ => (),
         }

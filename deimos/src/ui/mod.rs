@@ -11,7 +11,7 @@ use ratatui::{
 };
 use std::io::Stdout;
 
-use crate::action::Command;
+use crate::action::Action;
 
 #[derive(Debug, Default)]
 pub struct Ui {
@@ -68,7 +68,7 @@ impl ActiveState {
 /// Generic component trait. Components are expected to contain their own state.
 pub trait Component {
     #[allow(unused_variables)]
-    fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Command> {
+    fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Action> {
         None
     }
 }

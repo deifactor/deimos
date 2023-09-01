@@ -9,7 +9,7 @@ use ratatui::{
 };
 
 use crate::{
-    action::{Action, Command},
+    action::Action,
     library::{AlbumId, ArtistId, Library, Track},
 };
 
@@ -140,22 +140,18 @@ impl Search {
 }
 
 impl Component for Search {
-    fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Command> {
+    fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Action> {
         let old_query = self.query.clone();
         match keycode {
             KeyCode::Backspace => {
                 self.query.pop();
             }
             KeyCode::Char(c) => self.query.push(c),
-            KeyCode::Enter => {
-                return Some(Command::RunAction(Action::SelectEntity(
-                    self.results[0].clone(),
-                )))
-            }
+            KeyCode::Enter => return Some(Action::SelectEntity(self.results[0].clone())),
             _ => (),
         };
         if old_query != self.query {
-            Some(Command::RunAction(Action::RunSearch(self.query.clone())))
+            Some(Action::RunSearch(self.query.clone()))
         } else {
             None
         }

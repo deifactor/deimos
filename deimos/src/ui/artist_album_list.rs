@@ -11,7 +11,7 @@ use ratatui::{
 };
 
 use crate::{
-    action::{Action::LibraryTreeItemSelected, Command},
+    action::Action,
     library::{AlbumId, ArtistId, Library},
     ui::{Component, DeimosBackend, Ui},
 };
@@ -161,13 +161,11 @@ impl ArtistAlbumList {
         Ok(())
     }
 
-    /// Command to dispatch to load the tracks for this album.
-    pub fn load_tracks_command(&self) -> Option<Command> {
-        self.artist().map(|artist| {
-            Command::RunAction(LibraryTreeItemSelected {
-                artist,
-                album: self.album(),
-            })
+    /// Action to dispatch to load the tracks for this album.
+    pub fn load_tracks_action(&self) -> Option<Action> {
+        self.artist().map(|artist| Action::LibraryTreeItemSelected {
+            artist,
+            album: self.album(),
         })
     }
 }
@@ -235,13 +233,13 @@ impl ArtistAlbumList {
 }
 
 impl Component for ArtistAlbumList {
-    fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Command> {
+    fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Action> {
         match keycode {
             KeyCode::Up => self.move_selection(-1),
             KeyCode::Down => self.move_selection(1),
             KeyCode::Enter | KeyCode::Char(' ') => self.toggle(),
             _ => return None,
         }
-        self.load_tracks_command()
+        self.load_tracks_action()
     }
 }

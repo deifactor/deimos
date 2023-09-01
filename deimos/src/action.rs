@@ -1,15 +1,7 @@
-/// Defines [`Action`], which updates the model in some way, and [`Command`],
-/// which performs some kind of async blocking operation.
-///
-/// These are enums instead of a trait because:
-///
-/// - We don't have to box them all the time (performance doesn't matter, but it's verbose)
-/// - We can make their methods take them by move (can't call a by-move method on a boxed trait object)
-/// - Less verbose to declare a new action
+/// Defines [`Action`], which updates the model in some way.
 use anyhow::Result;
 
 use itertools::Itertools;
-use rodio::Sink;
 
 use symphonia::core::audio::AudioBuffer;
 use tokio::sync::mpsc::UnboundedSender;
@@ -17,7 +9,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use crate::{
     app::{App, Mode},
     decoder::TrackingSymphoniaDecoder,
-    library::{AlbumId, ArtistId, Library, Track},
+    library::{AlbumId, ArtistId, Track},
     ui::{
         now_playing::PlayState,
         search::{Search, SearchResult},
@@ -25,14 +17,8 @@ use crate::{
     },
 };
 
-/// An [`Action`] corresponds to a mutation of the application state. Actions
-/// should only be used in cases where the mutation can't be done in the
-/// function creating it, either because
-///
-/// - it's a component handler, which only has a mutable reference to that
-/// component
-/// - it's in a [`Command::execute`] implementation, which doesn't
-/// have a reference to the app state at all
+/// An [`Action`] corresponds to a mutation of the application state. All mutation of application
+/// state should be done through actions.
 pub enum Action {
     LibraryTreeItemSelected {
         artist: ArtistId,
@@ -52,7 +38,7 @@ impl Action {
         self,
         app: &mut App,
         tx_action: &UnboundedSender<Action>,
-    ) -> Result<Option<Command>> {
+    ) -> Result<Option<Action>> {
         use Action::*;
         match self {
             LibraryTreeItemSelected { artist, album } => match album {
@@ -96,9 +82,7 @@ impl Action {
                 }
                 .dispatch(app, tx_action)?;
                 if let Some(title) = result.track_title() {
-                    return Ok(Some(Command::RunAction(SelectEntityTracksLoaded(
-                        title.to_owned(),
-                    ))));
+                    return Ok(Some(SelectEntityTracksLoaded(title.to_owned())));
                 }
             }
             SelectEntityTracksLoaded(title) => app.library_panel.track_list.select(&title),
@@ -122,28 +106,5 @@ impl Action {
             Quit => app.quit(),
         }
         Ok(None)
-    }
-}
-
-/// A [`Command`] is the way for components to either talk to the external
-/// world a nonblocking way or apply a global mutation to the application
-/// state. For example, downloading data from the internet and talking to the
-/// database should both be done through a [`Command`], and the artist/album
-/// tree browser needs to send a command to update the track list.
-pub enum Command {
-    RunAction(Action),
-}
-
-impl Command {
-    pub fn execute(
-        self,
-        _library: &Library,
-        _sink: &Sink,
-        _tx_action: &UnboundedSender<Action>,
-    ) -> Result<Option<Action>> {
-        let action = match self {
-            Command::RunAction(action) => Some(action),
-        };
-        Ok(action)
     }
 }

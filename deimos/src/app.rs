@@ -12,7 +12,7 @@ use tokio::{
 use tokio_stream::{wrappers::UnboundedReceiverStream, Stream, StreamExt};
 
 use crate::{
-    action::{Action, Command},
+    action::Action,
     library::Library,
     library_panel::LibraryPanel,
     ui::{
@@ -85,19 +85,13 @@ impl App {
     fn handle_event(&mut self, event: AppEvent, tx_action: &UnboundedSender<Action>) -> Result<()> {
         let action = match event {
             AppEvent::Terminal(terminal_event) => {
-                if let Some(command) = self.handle_terminal(terminal_event) {
-                    command.execute(&self.library, &self.player_sink, tx_action)?
+                if let Some(action) = self.handle_terminal(terminal_event) {
+                    action.dispatch(self, tx_action)?
                 } else {
                     None
                 }
             }
-            AppEvent::Action(action) => {
-                if let Some(command) = action.dispatch(self, tx_action)? {
-                    command.execute(&self.library, &self.player_sink, tx_action)?
-                } else {
-                    None
-                }
-            }
+            AppEvent::Action(action) => action.dispatch(self, tx_action)?,
         };
         if let Some(action) = action {
             self.handle_event(AppEvent::Action(action), tx_action)?;
@@ -123,10 +117,10 @@ impl App {
         Ok(())
     }
 
-    fn handle_terminal(&mut self, ev: Event) -> Option<Command> {
+    fn handle_terminal(&mut self, ev: Event) -> Option<Action> {
         let Event::Key(KeyEvent { code, kind: KeyEventKind::Press, .. }) = ev else { return None };
         match code {
-            KeyCode::Esc | KeyCode::Char('q') => return Some(Command::RunAction(Action::Quit)),
+            KeyCode::Esc | KeyCode::Char('q') => return Some(Action::Quit),
             KeyCode::Char('/') => {
                 self.mode = Mode::Search;
                 self.search = Search::default();

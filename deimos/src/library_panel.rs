@@ -3,7 +3,7 @@ use enum_iterator::{next_cycle, Sequence};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 use crate::{
-    action::Command,
+    action::Action,
     ui::{
         artist_album_list::ArtistAlbumList, search::SearchResult, track_list::TrackList,
         ActiveState, Component, DeimosBackend, Ui,
@@ -58,7 +58,7 @@ impl LibraryPanel {
 }
 
 impl Component for LibraryPanel {
-    fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Command> {
+    fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Action> {
         match keycode {
             KeyCode::Tab => {
                 self.focus = next_cycle(&self.focus).unwrap();
