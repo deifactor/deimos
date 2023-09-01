@@ -12,7 +12,7 @@ use itertools::Itertools;
 use rodio::Sink;
 
 use symphonia::core::audio::AudioBuffer;
-use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
+use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
     app::{App, Mode},
@@ -41,6 +41,7 @@ pub enum Action {
     SetSearchResults(Vec<SearchResult>),
     SelectEntity(SearchResult),
     SelectEntityTracksLoaded(String),
+    Quit,
 }
 
 impl Action {
@@ -82,6 +83,7 @@ impl Action {
                 }
             }
             SelectEntityTracksLoaded(title) => app.library_panel.track_list.select(&title),
+            Quit => app.quit(),
         }
         Ok(None)
     }
@@ -105,11 +107,10 @@ pub enum Command {
     /// Perform these commands in sequence. All commands are executed in
     /// sequence and then their actions are applied.
     Sequence(Vec<Command>),
-    Quit,
 }
 
 impl Command {
-    fn execute(
+    pub fn execute(
         self,
         library: &Library,
         sink: &Sink,
@@ -167,27 +168,7 @@ impl Command {
             }
 
             Command::RunAction(action) => Some(action),
-
-            Command::Quit => panic!("we should have quit by now"),
         };
         Ok(action)
-    }
-
-    /// Spawns an executor task that will forever execute any commands sent via the returned command sender.
-    pub fn spawn_executor(
-        library: Library,
-        sink: Sink,
-        send_action: UnboundedSender<Action>,
-    ) -> UnboundedSender<Command> {
-        let (tx_cmd, mut rx_cmd) = unbounded_channel::<Command>();
-        tokio::spawn(async move {
-            while let Some(command) = rx_cmd.recv().await {
-                if let Some(action) = command.execute(&library, &sink, &send_action).unwrap() {
-                    send_action.send(action).unwrap();
-                }
-            }
-            anyhow::Ok(())
-        });
-        tx_cmd
     }
 }

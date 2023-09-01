@@ -5,8 +5,11 @@ use ratatui::{
     Frame, Terminal,
 };
 use rodio::Sink;
-use tokio::{pin, sync::mpsc::unbounded_channel};
-use tokio_stream::{Stream, StreamExt};
+use tokio::{
+    pin,
+    sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+};
+use tokio_stream::{wrappers::UnboundedReceiverStream, Stream, StreamExt};
 
 use crate::{
     action::{Action, Command},
@@ -33,6 +36,7 @@ pub struct App {
     pub search: Search,
     pub mode: Mode,
     pub ui: Ui,
+    should_quit: bool,
 }
 
 impl App {
@@ -45,28 +49,53 @@ impl App {
     ) -> Result<()> {
         self.library_panel.artist_album_list = ArtistAlbumList::new(&library);
 
-        let (tx_action, mut rx_action) = unbounded_channel::<Action>();
-        let sender = Command::spawn_executor(library, sink, tx_action.clone());
+        let (tx_action, rx_action) = unbounded_channel::<Action>();
         pin!(terminal_events);
 
-        loop {
-            tokio::select! {
-                Some(ev) = terminal_events.next() =>
-                    if let Some(command) = self.handle_event(ev) {
-                        if matches!(command, Command::Quit) {
-                            return Ok(())
-                        }
-                        sender.send(command)?;
+        let mut event_stream = AppEvent::stream(terminal_events, rx_action);
 
-                    },
-                Some(action) = rx_action.recv() => {
-                    if let Some(command) = action.dispatch(&mut self)? {
-                        sender.send(command)?;
-                    }
+        while let Some(event) = event_stream.next().await {
+            self.handle_event(event, &library, &sink, &tx_action)?;
+            terminal.draw(|f| self.draw(f).expect("failed to rerender app"))?;
+            if self.should_quit {
+                return Ok(());
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn quit(&mut self) {
+        self.should_quit = true;
+    }
+
+    fn handle_event(
+        &mut self,
+        event: AppEvent,
+        library: &Library,
+        sink: &Sink,
+        tx_action: &UnboundedSender<Action>,
+    ) -> Result<()> {
+        let action = match event {
+            AppEvent::Terminal(terminal_event) => {
+                if let Some(command) = self.handle_terminal(terminal_event) {
+                    command.execute(library, sink, tx_action)?
+                } else {
+                    None
                 }
             }
-            terminal.draw(|f| self.draw(f).expect("failed to rerender app"))?;
+            AppEvent::Action(action) => {
+                if let Some(command) = action.dispatch(self)? {
+                    command.execute(library, sink, tx_action)?
+                } else {
+                    None
+                }
+            }
+        };
+        if let Some(action) = action {
+            self.handle_event(AppEvent::Action(action), library, sink, tx_action)?;
         }
+        Ok(())
     }
 
     pub fn draw(&mut self, f: &mut Frame<'_, DeimosBackend>) -> Result<()> {
@@ -87,10 +116,10 @@ impl App {
         Ok(())
     }
 
-    fn handle_event(&mut self, ev: Event) -> Option<Command> {
+    fn handle_terminal(&mut self, ev: Event) -> Option<Command> {
         let Event::Key(KeyEvent { code, kind: KeyEventKind::Press, .. }) = ev else { return None };
         match code {
-            KeyCode::Esc | KeyCode::Char('q') => return Some(Command::Quit),
+            KeyCode::Esc | KeyCode::Char('q') => return Some(Command::RunAction(Action::Quit)),
             KeyCode::Char('/') => {
                 self.mode = Mode::Search;
                 self.search = Search::default();
@@ -103,5 +132,21 @@ impl App {
             }
         }
         None
+    }
+}
+
+enum AppEvent {
+    Terminal(Event),
+    Action(Action),
+}
+
+impl AppEvent {
+    fn stream(
+        terminal_events: impl Stream<Item = Event>,
+        rx_action: UnboundedReceiver<Action>,
+    ) -> impl Stream<Item = Self> {
+        UnboundedReceiverStream::new(rx_action)
+            .map(AppEvent::Action)
+            .merge(terminal_events.map(AppEvent::Terminal))
     }
 }
