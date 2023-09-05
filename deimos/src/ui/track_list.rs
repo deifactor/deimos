@@ -11,7 +11,7 @@ use ratatui::{
 use crate::{
     action::Action,
     library::Track,
-    ui::{Component, DeimosBackend, Ui},
+    ui::{DeimosBackend, Ui},
 };
 
 use super::ActiveState;
@@ -126,10 +126,8 @@ impl TrackList {
         frame.render_stateful_widget(list, area, &mut self.state);
         Ok(())
     }
-}
 
-impl Component for TrackList {
-    fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Action> {
+    pub fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Action> {
         match keycode {
             KeyCode::Up => self.move_selection(-1),
             KeyCode::Down => self.move_selection(1),

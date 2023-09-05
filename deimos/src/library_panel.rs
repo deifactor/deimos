@@ -6,7 +6,7 @@ use crate::{
     action::Action,
     ui::{
         artist_album_list::ArtistAlbumList, search::SearchResult, track_list::TrackList,
-        ActiveState, Component, DeimosBackend, Ui,
+        ActiveState, DeimosBackend, Ui,
     },
 };
 
@@ -55,10 +55,8 @@ impl LibraryPanel {
         )?;
         Ok(())
     }
-}
 
-impl Component for LibraryPanel {
-    fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Action> {
+    pub fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Action> {
         match keycode {
             KeyCode::Tab => {
                 self.focus = next_cycle(&self.focus).unwrap();

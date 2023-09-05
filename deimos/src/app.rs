@@ -17,7 +17,7 @@ use crate::{
     library_panel::LibraryPanel,
     ui::{
         artist_album_list::ArtistAlbumList, now_playing::NowPlaying, search::Search,
-        spectrogram::Visualizer, Component, DeimosBackend, Ui,
+        spectrogram::Visualizer, DeimosBackend, Ui,
     },
 };
 

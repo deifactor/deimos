@@ -13,7 +13,7 @@ use crate::{
     library::{AlbumId, ArtistId, Library, Track},
 };
 
-use super::{ActiveState, Component, DeimosBackend};
+use super::{ActiveState, DeimosBackend};
 
 /// Searches the library. Searches in album names, artist names, and track names.
 
@@ -137,10 +137,8 @@ impl Search {
         frame.render_stateful_widget(results, root[1], &mut self.state);
         Ok(())
     }
-}
 
-impl Component for Search {
-    fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Action> {
+    pub fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Action> {
         let old_query = self.query.clone();
         match keycode {
             KeyCode::Backspace => {

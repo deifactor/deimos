@@ -13,7 +13,7 @@ use ratatui::{
 use crate::{
     action::Action,
     library::{AlbumId, ArtistId, Library},
-    ui::{Component, DeimosBackend, Ui},
+    ui::{DeimosBackend, Ui},
 };
 
 use super::ActiveState;
@@ -230,10 +230,8 @@ impl ArtistAlbumList {
         }
         Ok(())
     }
-}
 
-impl Component for ArtistAlbumList {
-    fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Action> {
+    pub fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Action> {
         match keycode {
             KeyCode::Up => self.move_selection(-1),
             KeyCode::Down => self.move_selection(1),

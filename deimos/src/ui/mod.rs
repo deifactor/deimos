@@ -4,14 +4,11 @@ pub mod search;
 pub mod spectrogram;
 pub mod track_list;
 
-use crossterm::event::KeyCode;
 use ratatui::{
     backend::CrosstermBackend,
     style::{Color, Modifier, Style},
 };
 use std::io::Stdout;
-
-use crate::action::Action;
 
 #[derive(Debug, Default)]
 pub struct Ui {
@@ -62,13 +59,5 @@ impl ActiveState {
         } else {
             Self::Inactive
         }
-    }
-}
-
-/// Generic component trait. Components are expected to contain their own state.
-pub trait Component {
-    #[allow(unused_variables)]
-    fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Action> {
-        None
     }
 }
