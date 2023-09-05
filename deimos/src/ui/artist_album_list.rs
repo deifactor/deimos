@@ -11,7 +11,7 @@ use ratatui::{
 };
 
 use crate::{
-    action::Action,
+    app::Action,
     library::{AlbumId, ArtistId, Library},
     ui::{DeimosBackend, Ui},
 };

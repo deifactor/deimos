@@ -3,7 +3,7 @@ use enum_iterator::{next_cycle, Sequence};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 use crate::{
-    action::Action,
+    app::Action,
     ui::{
         artist_album_list::ArtistAlbumList, search::SearchResult, track_list::TrackList,
         ActiveState, DeimosBackend, Ui,

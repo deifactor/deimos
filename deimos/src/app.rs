@@ -1,10 +1,12 @@
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
+use itertools::Itertools;
 use ratatui::{
     layout::{Constraint, Direction, Layout},
     Frame, Terminal,
 };
 use rodio::Sink;
+use symphonia::core::audio::AudioBuffer;
 use tokio::{
     pin,
     sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
@@ -12,12 +14,16 @@ use tokio::{
 use tokio_stream::{wrappers::UnboundedReceiverStream, Stream, StreamExt};
 
 use crate::{
-    action::Action,
-    library::Library,
+    decoder::TrackingSymphoniaDecoder,
+    library::{AlbumId, ArtistId, Library, Track},
     library_panel::LibraryPanel,
     ui::{
-        artist_album_list::ArtistAlbumList, now_playing::NowPlaying, search::Search,
-        spectrogram::Visualizer, DeimosBackend, Ui,
+        artist_album_list::ArtistAlbumList,
+        now_playing::{NowPlaying, PlayState},
+        search::{Search, SearchResult},
+        spectrogram::Visualizer,
+        track_list::{TrackList, TrackListItem},
+        DeimosBackend, Ui,
     },
 };
 
@@ -29,14 +35,14 @@ pub enum Mode {
 }
 
 pub struct App {
-    pub library: Library,
-    pub player_sink: Sink,
-    pub library_panel: LibraryPanel,
-    pub now_playing: NowPlaying,
-    pub visualizer: Visualizer,
-    pub search: Search,
-    pub mode: Mode,
-    pub ui: Ui,
+    library: Library,
+    player_sink: Sink,
+    library_panel: LibraryPanel,
+    now_playing: NowPlaying,
+    visualizer: Visualizer,
+    search: Search,
+    mode: Mode,
+    ui: Ui,
     should_quit: bool,
 }
 
@@ -86,12 +92,12 @@ impl App {
         let action = match event {
             AppEvent::Terminal(terminal_event) => {
                 if let Some(action) = self.handle_terminal(terminal_event) {
-                    action.dispatch(self, tx_action)?
+                    self.dispatch(action, tx_action)?
                 } else {
                     None
                 }
             }
-            AppEvent::Action(action) => action.dispatch(self, tx_action)?,
+            AppEvent::Action(action) => self.dispatch(action, tx_action)?,
         };
         if let Some(action) = action {
             self.handle_event(AppEvent::Action(action), tx_action)?;
@@ -133,6 +139,100 @@ impl App {
             }
         }
         None
+    }
+}
+
+/// An [`Action`] corresponds to a mutation of the application state. All mutation of application
+/// state should be done through actions.
+pub enum Action {
+    LibraryTreeItemSelected {
+        artist: ArtistId,
+        album: Option<AlbumId>,
+    },
+    SetNowPlaying(Option<PlayState>),
+    UpdateSpectrum(AudioBuffer<f32>),
+    RunSearch(String),
+    SelectEntity(SearchResult),
+    SelectEntityTracksLoaded(String),
+    PlayTrack(Track),
+    Quit,
+}
+
+impl App {
+    pub fn dispatch(
+        &mut self,
+        action: Action,
+        tx_action: &UnboundedSender<Action>,
+    ) -> Result<Option<Action>> {
+        use Action::*;
+        match action {
+            LibraryTreeItemSelected { artist, album } => match album {
+                Some(album) => {
+                    let tracks = self.library.artists[&artist].albums[&album].tracks.clone();
+                    self.library_panel.track_list =
+                        TrackList::new(tracks.into_iter().map(TrackListItem::Track).collect());
+                }
+                None => {
+                    let mut albums = self.library.artists[&artist]
+                        .albums
+                        .iter()
+                        .map(|(id, album)| (format!("{}", id), album.tracks.clone()))
+                        .collect_vec();
+                    albums.sort_unstable_by_key(|(id, _)| id.clone());
+                    self.library_panel.track_list = TrackList::new(
+                        albums
+                            .into_iter()
+                            .flat_map(|(title, tracks)| {
+                                std::iter::once(TrackListItem::Section(title))
+                                    .chain(tracks.into_iter().map(TrackListItem::Track))
+                            })
+                            .collect(),
+                    );
+                }
+            },
+            SetNowPlaying(play_state) => self.now_playing.play_state = play_state,
+            UpdateSpectrum(buf) => {
+                self.visualizer.update_spectrum(buf).unwrap();
+            }
+            RunSearch(query) => {
+                let results = Search::run_search_query(&self.library, query)?;
+                self.search.set_results(results);
+            }
+            SelectEntity(result) => {
+                self.mode = Mode::Play;
+                self.library_panel.select_entity(&result);
+                self.dispatch(
+                    LibraryTreeItemSelected {
+                        artist: result.album_artist().clone(),
+                        album: result.album().cloned(),
+                    },
+                    tx_action,
+                )?;
+                if let Some(title) = result.track_title() {
+                    return Ok(Some(SelectEntityTracksLoaded(title.to_owned())));
+                }
+            }
+            SelectEntityTracksLoaded(title) => self.library_panel.track_list.select(&title),
+            PlayTrack(track) => {
+                let tx_action = tx_action.clone();
+                let decoder = TrackingSymphoniaDecoder::from_path(&track.path)?.with_callback(
+                    move |buffer, timestamp| {
+                        tx_action
+                            .send(Action::SetNowPlaying(Some(PlayState {
+                                timestamp,
+                                track: track.clone(),
+                            })))
+                            .unwrap();
+                        tx_action.send(Action::UpdateSpectrum(buffer)).unwrap();
+                    },
+                );
+                self.player_sink.stop();
+                self.player_sink.append(decoder);
+                self.player_sink.play();
+            }
+            Quit => self.quit(),
+        }
+        Ok(None)
     }
 }
 

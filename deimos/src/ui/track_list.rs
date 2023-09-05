@@ -9,7 +9,7 @@ use ratatui::{
 };
 
 use crate::{
-    action::Action,
+    app::Action,
     library::Track,
     ui::{DeimosBackend, Ui},
 };

@@ -1,4 +1,3 @@
-mod action;
 mod app;
 mod decoder;
 mod library;
