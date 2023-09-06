@@ -29,9 +29,9 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum Mode {
+pub enum Panel {
     #[default]
-    Play,
+    Library,
     Search,
 }
 
@@ -42,7 +42,7 @@ pub struct App {
     now_playing: NowPlaying,
     visualizer: Visualizer,
     search: Search,
-    mode: Mode,
+    active_panel: Panel,
     ui: Ui,
     should_quit: bool,
 }
@@ -56,7 +56,7 @@ impl App {
             now_playing: NowPlaying::default(),
             visualizer: Visualizer::default(),
             search: Search::default(),
-            mode: Mode::Play,
+            active_panel: Panel::Library,
             ui: Ui::default(),
             should_quit: false,
         }
@@ -107,9 +107,9 @@ impl App {
             .direction(Direction::Vertical)
             .constraints([Constraint::Min(10), Constraint::Max(6)])
             .split(f.size());
-        match self.mode {
-            Mode::Play => self.library_panel.draw(&self.ui, f, root[0])?,
-            Mode::Search => self.search.draw(&self.ui, f, root[0])?,
+        match self.active_panel {
+            Panel::Library => self.library_panel.draw(&self.ui, f, root[0])?,
+            Panel::Search => self.search.draw(&self.ui, f, root[0])?,
         }
         let bottom = Layout::default()
             .direction(Direction::Horizontal)
@@ -179,7 +179,7 @@ impl App {
         use Action::*;
         match action {
             StartSearch => {
-                self.mode = Mode::Search;
+                self.active_panel = Panel::Search;
                 self.search = Search::default();
             }
             SetSearchQuery(query) => {
@@ -216,7 +216,7 @@ impl App {
                 self.visualizer.update_spectrum(buf).unwrap();
             }
             SelectEntity(result) => {
-                self.mode = Mode::Play;
+                self.active_panel = Panel::Library;
                 self.library_panel.select_entity(&result);
                 self.dispatch(
                     LibraryTreeItemSelected {
@@ -253,8 +253,8 @@ impl App {
                     Motion::Up => -1,
                     Motion::Down => 1,
                 };
-                match self.mode {
-                    Mode::Play => match self.library_panel.focus {
+                match self.active_panel {
+                    Panel::Library => match self.library_panel.focus {
                         PanelItem::ArtistAlbumList => {
                             self.library_panel.artist_album_list.move_selection(delta);
                             return Ok(self.library_panel.artist_album_list.load_tracks_action());
@@ -263,7 +263,7 @@ impl App {
                             self.library_panel.track_list.move_selection(delta);
                         }
                     },
-                    Mode::Search => todo!(),
+                    Panel::Search => todo!(),
                 }
             }
             SetFocus(focus) => {
@@ -279,8 +279,8 @@ impl App {
         Some(match command {
             NextFocus => Action::SetFocus(next_cycle(&self.library_panel.focus).unwrap()),
             StartSearch => Action::StartSearch,
-            Activate => match self.mode {
-                Mode::Play => match self.library_panel.focus {
+            Activate => match self.active_panel {
+                Panel::Library => match self.library_panel.focus {
                     PanelItem::ArtistAlbumList => Action::ToggleArtistAlbumList,
                     PanelItem::TrackList => self
                         .library_panel
@@ -289,7 +289,7 @@ impl App {
                         .cloned()
                         .map(Action::PlayTrack)?,
                 },
-                Mode::Search => self.search.selected_result().map(Action::SelectEntity)?,
+                Panel::Search => self.search.selected_result().map(Action::SelectEntity)?,
             },
             MoveCursor(motion) => Action::MoveCursor(motion),
             SearchInput(c) => Action::SetSearchQuery(format!("{}{}", self.search.query(), c)),
@@ -321,12 +321,12 @@ impl AppEvent {
 
 impl App {
     fn key_to_command(&self, key: KeyCode) -> Option<Command> {
-        let action = match (self.mode, key) {
-            (Mode::Play, KeyCode::Char('/')) => Command::StartSearch,
-            (Mode::Play, KeyCode::Char('q')) => Command::Quit,
-            (Mode::Play, KeyCode::Tab) => Command::NextFocus,
-            (Mode::Search, KeyCode::Char(c)) => Command::SearchInput(c),
-            (Mode::Search, KeyCode::Backspace) => Command::SearchBackspace,
+        let action = match (self.active_panel, key) {
+            (Panel::Library, KeyCode::Char('/')) => Command::StartSearch,
+            (Panel::Library, KeyCode::Char('q')) => Command::Quit,
+            (Panel::Library, KeyCode::Tab) => Command::NextFocus,
+            (Panel::Search, KeyCode::Char(c)) => Command::SearchInput(c),
+            (Panel::Search, KeyCode::Backspace) => Command::SearchBackspace,
             (_, KeyCode::Up) => Command::MoveCursor(Motion::Up),
             (_, KeyCode::Down) => Command::MoveCursor(Motion::Down),
             (_, KeyCode::Enter) => Command::Activate,
