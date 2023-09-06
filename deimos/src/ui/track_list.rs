@@ -1,5 +1,4 @@
 use anyhow::Result;
-use crossterm::event::KeyCode;
 use itertools::Itertools;
 use ratatui::{
     layout::Rect,
@@ -9,7 +8,6 @@ use ratatui::{
 };
 
 use crate::{
-    app::Action,
     library::Track,
     ui::{DeimosBackend, Ui},
 };
@@ -125,19 +123,5 @@ impl TrackList {
         .block(block);
         frame.render_stateful_widget(list, area, &mut self.state);
         Ok(())
-    }
-
-    pub fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Action> {
-        match keycode {
-            KeyCode::Up => self.move_selection(-1),
-            KeyCode::Down => self.move_selection(1),
-            KeyCode::Enter => {
-                return self
-                    .selected()
-                    .map(|track| Action::PlayTrack(track.clone()))
-            }
-            _ => (),
-        }
-        None
     }
 }

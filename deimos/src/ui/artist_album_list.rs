@@ -1,7 +1,6 @@
 use std::collections::HashSet;
 
 use anyhow::{anyhow, Result};
-use crossterm::event::KeyCode;
 use itertools::Itertools;
 use ratatui::{
     layout::Rect,
@@ -229,15 +228,5 @@ impl ArtistAlbumList {
             );
         }
         Ok(())
-    }
-
-    pub fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Action> {
-        match keycode {
-            KeyCode::Up => self.move_selection(-1),
-            KeyCode::Down => self.move_selection(1),
-            KeyCode::Enter | KeyCode::Char(' ') => self.toggle(),
-            _ => return None,
-        }
-        self.load_tracks_action()
     }
 }

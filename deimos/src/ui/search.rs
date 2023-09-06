@@ -1,5 +1,4 @@
 use anyhow::Result;
-use crossterm::event::KeyCode;
 use itertools::Itertools;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
@@ -8,10 +7,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::{
-    app::Action,
-    library::{AlbumId, ArtistId, Library, Track},
-};
+use crate::library::{AlbumId, ArtistId, Library, Track};
 
 use super::{ActiveState, DeimosBackend};
 
@@ -56,9 +52,22 @@ pub struct Search {
     results: Vec<SearchResult>,
     state: ListState,
 }
+
 impl Search {
+    pub fn query(&self) -> &str {
+        &self.query
+    }
+
+    pub fn set_query(&mut self, query: String) {
+        self.query = query;
+    }
+
     pub fn set_results(&mut self, results: Vec<SearchResult>) {
         self.results = results;
+    }
+
+    pub fn selected_result(&self) -> Option<SearchResult> {
+        self.results.get(0).cloned()
     }
 
     fn render_result(&self, track: &SearchResult) -> ListItem<'static> {
@@ -136,22 +145,5 @@ impl Search {
         .block(block);
         frame.render_stateful_widget(results, root[1], &mut self.state);
         Ok(())
-    }
-
-    pub fn handle_keycode(&mut self, keycode: KeyCode) -> Option<Action> {
-        let old_query = self.query.clone();
-        match keycode {
-            KeyCode::Backspace => {
-                self.query.pop();
-            }
-            KeyCode::Char(c) => self.query.push(c),
-            KeyCode::Enter => return Some(Action::SelectEntity(self.results[0].clone())),
-            _ => (),
-        };
-        if old_query != self.query {
-            Some(Action::RunSearch(self.query.clone()))
-        } else {
-            None
-        }
     }
 }
