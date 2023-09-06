@@ -147,7 +147,6 @@ pub enum Action {
     UpdateSpectrum(AudioBuffer<f32>),
     SetSearchQuery(String),
     SelectEntity(SearchResult),
-    SelectEntityTracksLoaded(String),
     PlayTrack(Track),
     SetFocus(PanelItem),
     Quit,
@@ -226,10 +225,9 @@ impl App {
                     tx_action,
                 )?;
                 if let Some(title) = result.track_title() {
-                    return Ok(Some(SelectEntityTracksLoaded(title.to_owned())));
+                    self.library_panel.track_list.select(title);
                 }
             }
-            SelectEntityTracksLoaded(title) => self.library_panel.track_list.select(&title),
             PlayTrack(track) => {
                 let tx_action = tx_action.clone();
                 let decoder = TrackingSymphoniaDecoder::from_path(&track.path)?.with_callback(
