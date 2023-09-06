@@ -10,7 +10,6 @@ use ratatui::{
 };
 
 use crate::{
-    app::Action,
     library::{AlbumId, ArtistId, Library},
     ui::{DeimosBackend, Ui},
 };
@@ -158,14 +157,6 @@ impl ArtistAlbumList {
             .iter()
             .position(|row| row.artist == artist_index && row.album == album_index);
         Ok(())
-    }
-
-    /// Action to dispatch to load the tracks for this album.
-    pub fn load_tracks_action(&self) -> Option<Action> {
-        self.artist().map(|artist| Action::LibraryTreeItemSelected {
-            artist,
-            album: self.album(),
-        })
     }
 }
 

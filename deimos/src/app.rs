@@ -1,7 +1,6 @@
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use enum_iterator::next_cycle;
-use itertools::Itertools;
 use ratatui::{
     layout::{Constraint, Direction, Layout},
     Frame, Terminal,
@@ -16,14 +15,13 @@ use tokio_stream::{wrappers::UnboundedReceiverStream, Stream, StreamExt};
 
 use crate::{
     decoder::TrackingSymphoniaDecoder,
-    library::{AlbumId, ArtistId, Library, Track},
+    library::{Library, Track},
     library_panel::{LibraryPanel, PanelItem},
     ui::{
         artist_album_list::ArtistAlbumList,
         now_playing::{NowPlaying, PlayState},
         search::{Search, SearchResult},
         spectrogram::Visualizer,
-        track_list::{TrackList, TrackListItem},
         DeimosBackend, Ui,
     },
 };
@@ -139,10 +137,6 @@ pub enum Action {
     StartSearch,
     MoveCursor(Motion),
     ToggleArtistAlbumList,
-    LibraryTreeItemSelected {
-        artist: ArtistId,
-        album: Option<AlbumId>,
-    },
     SetNowPlaying(Option<PlayState>),
     UpdateSpectrum(AudioBuffer<f32>),
     SetSearchQuery(String),
@@ -186,47 +180,13 @@ impl App {
                 let results = Search::run_search_query(&self.library, self.search.query())?;
                 self.search.set_results(results);
             }
-            LibraryTreeItemSelected { artist, album } => match album {
-                Some(album) => {
-                    let tracks = self.library.artists[&artist].albums[&album].tracks.clone();
-                    self.library_panel.track_list =
-                        TrackList::new(tracks.into_iter().map(TrackListItem::Track).collect());
-                }
-                None => {
-                    let mut albums = self.library.artists[&artist]
-                        .albums
-                        .iter()
-                        .map(|(id, album)| (format!("{}", id), album.tracks.clone()))
-                        .collect_vec();
-                    albums.sort_unstable_by_key(|(id, _)| id.clone());
-                    self.library_panel.track_list = TrackList::new(
-                        albums
-                            .into_iter()
-                            .flat_map(|(title, tracks)| {
-                                std::iter::once(TrackListItem::Section(title))
-                                    .chain(tracks.into_iter().map(TrackListItem::Track))
-                            })
-                            .collect(),
-                    );
-                }
-            },
             SetNowPlaying(play_state) => self.now_playing.play_state = play_state,
             UpdateSpectrum(buf) => {
                 self.visualizer.update_spectrum(buf).unwrap();
             }
             SelectEntity(result) => {
                 self.active_panel = Panel::Library;
-                self.library_panel.select_entity(&result);
-                self.dispatch(
-                    LibraryTreeItemSelected {
-                        artist: result.album_artist().clone(),
-                        album: result.album().cloned(),
-                    },
-                    tx_action,
-                )?;
-                if let Some(title) = result.track_title() {
-                    self.library_panel.track_list.select(title);
-                }
+                self.library_panel.select_entity(&self.library, &result)?;
             }
             PlayTrack(track) => {
                 let tx_action = tx_action.clone();
@@ -252,15 +212,9 @@ impl App {
                     Motion::Down => 1,
                 };
                 match self.active_panel {
-                    Panel::Library => match self.library_panel.focus {
-                        PanelItem::ArtistAlbumList => {
-                            self.library_panel.artist_album_list.move_selection(delta);
-                            return Ok(self.library_panel.artist_album_list.load_tracks_action());
-                        }
-                        PanelItem::TrackList => {
-                            self.library_panel.track_list.move_selection(delta);
-                        }
-                    },
+                    Panel::Library => {
+                        self.library_panel.move_selection(&self.library, delta)?;
+                    }
                     Panel::Search => todo!(),
                 }
             }
