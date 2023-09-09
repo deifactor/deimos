@@ -88,20 +88,16 @@ impl App {
         event: AppEvent,
         tx_message: &UnboundedSender<Message>,
     ) -> Result<()> {
-        let message = match event {
+        match event {
             AppEvent::Terminal(terminal_event) => {
                 if let Some(message) = self.handle_terminal(terminal_event) {
-                    self.dispatch(message, tx_message)?
+                    self.dispatch(message, tx_message)
                 } else {
-                    None
+                    Ok(())
                 }
             }
-            AppEvent::Message(message) => self.dispatch(message, tx_message)?,
-        };
-        if let Some(message) = message {
-            self.handle_event(AppEvent::Message(message), tx_message)?;
+            AppEvent::Message(message) => self.dispatch(message, tx_message),
         }
-        Ok(())
     }
 
     pub fn draw(&mut self, f: &mut Frame<'_, DeimosBackend>) -> Result<()> {
@@ -183,11 +179,7 @@ impl App {
         };
         Some(message)
     }
-    fn dispatch(
-        &mut self,
-        message: Message,
-        tx_message: &UnboundedSender<Message>,
-    ) -> Result<Option<Message>> {
+    fn dispatch(&mut self, message: Message, tx_message: &UnboundedSender<Message>) -> Result<()> {
         use Message::*;
         match message {
             StartSearch => {
@@ -242,7 +234,7 @@ impl App {
             }
             ToggleArtistAlbumList => self.library_panel.artist_album_list.toggle(),
         }
-        Ok(None)
+        Ok(())
     }
 
     fn dispatch_command(&self, command: Command) -> Option<Message> {
