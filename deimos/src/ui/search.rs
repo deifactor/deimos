@@ -7,7 +7,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::library::{AlbumId, ArtistId, Library, Track};
+use crate::library::{AlbumName, ArtistName, Library, Track};
 
 use super::{ActiveState, DeimosBackend};
 
@@ -16,13 +16,13 @@ use super::{ActiveState, DeimosBackend};
 /// Things that match the search.
 #[derive(Debug, Clone)]
 pub enum SearchResult {
-    Artist(ArtistId),
-    Album(AlbumId, ArtistId),
+    Artist(ArtistName),
+    Album(AlbumName, ArtistName),
     Track(Track),
 }
 
 impl SearchResult {
-    pub fn album_artist(&self) -> &ArtistId {
+    pub fn album_artist(&self) -> &ArtistName {
         match self {
             SearchResult::Artist(artist) => artist,
             SearchResult::Album(_, artist) => artist,
@@ -30,7 +30,7 @@ impl SearchResult {
         }
     }
 
-    pub fn album(&self) -> Option<&AlbumId> {
+    pub fn album(&self) -> Option<&AlbumName> {
         match self {
             SearchResult::Artist(_) => None,
             SearchResult::Album(album, _) => Some(album),
@@ -92,18 +92,18 @@ impl Search {
         let is_match = |haystack: &String| haystack.to_lowercase().contains(&query.to_lowercase());
         let artists = library
             .artists()
-            .map(|a| &a.id)
+            .map(|a| &a.name)
             .filter(|id| match id {
-                ArtistId::Unknown => false,
-                ArtistId::Artist(name) => is_match(name),
+                ArtistName::Unknown => false,
+                ArtistName::Artist(name) => is_match(name),
             })
             .cloned()
             .map(SearchResult::Artist);
 
         let albums = library
             .albums_with_artist()
-            .filter(|(album, _)| album.id.0.as_ref().map_or(false, is_match))
-            .map(|(album, artist)| SearchResult::Album(album.id.clone(), artist.id.clone()));
+            .filter(|(album, _)| album.name.0.as_ref().map_or(false, is_match))
+            .map(|(album, artist)| SearchResult::Album(album.name.clone(), artist.name.clone()));
 
         let tracks = library
             .tracks()

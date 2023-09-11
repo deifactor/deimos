@@ -10,7 +10,7 @@ use ratatui::{
 };
 
 use crate::{
-    library::{AlbumId, ArtistId, Library},
+    library::{AlbumName, ArtistName, Library},
     ui::{DeimosBackend, Ui},
 };
 
@@ -18,8 +18,8 @@ use super::ActiveState;
 
 #[derive(Debug)]
 struct ArtistItem {
-    artist: ArtistId,
-    albums: Vec<AlbumId>,
+    artist: ArtistName,
+    albums: Vec<AlbumName>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -57,7 +57,7 @@ impl ArtistAlbumList {
                 let mut albums = artist.albums.keys().cloned().collect_vec();
                 albums.sort_unstable();
                 ArtistItem {
-                    artist: artist.id.clone(),
+                    artist: artist.name.clone(),
                     albums,
                 }
             })
@@ -72,12 +72,12 @@ impl ArtistAlbumList {
         list
     }
 
-    pub fn artist(&self) -> Option<ArtistId> {
+    pub fn artist(&self) -> Option<ArtistName> {
         let idx = self.selected?;
         Some(self.artists[self.rows[idx].artist].artist.clone())
     }
 
-    pub fn album(&self) -> Option<AlbumId> {
+    pub fn album(&self) -> Option<AlbumName> {
         let idx = self.selected?;
         let artist = self.rows[idx].artist;
         let album = self.rows[idx].album?;
@@ -135,7 +135,7 @@ impl ArtistAlbumList {
 
     /// Move the selection to the given artist (and optionally album),
     /// expanding it if they aren't already. Errors if that artist/album does not exist.
-    pub fn select(&mut self, artist: &ArtistId, album: Option<&AlbumId>) -> Result<()> {
+    pub fn select(&mut self, artist: &ArtistName, album: Option<&AlbumName>) -> Result<()> {
         // XXX: linear scanning is inefficient!
         let (artist_index, item) = self
             .artists

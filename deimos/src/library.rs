@@ -12,12 +12,12 @@ use walkdir::WalkDir;
 /// Stores information about the library as a whole.
 #[derive(Debug, Clone, Default)]
 pub struct Library {
-    pub artists: HashMap<ArtistId, Artist>,
+    pub artists: HashMap<ArtistName, Artist>,
 }
 
 // Intentionally *not* `Option<String>` so that we can support "Various Artists" later.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ArtistId {
+pub enum ArtistName {
     Unknown,
     Artist(String),
 }
@@ -26,33 +26,36 @@ pub enum ArtistId {
 /// self.name`.
 #[derive(Debug, Clone)]
 pub struct Artist {
-    pub id: ArtistId,
-    pub albums: HashMap<AlbumId, Album>,
+    pub name: ArtistName,
+    pub albums: HashMap<AlbumName, Album>,
 }
 
 impl Artist {
-    pub fn new(id: ArtistId) -> Self {
+    pub fn new(name: ArtistName) -> Self {
         Self {
-            id,
+            name,
             albums: HashMap::new(),
         }
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord, Hash)]
-pub struct AlbumId(pub Option<String>);
+pub struct AlbumName(pub Option<String>);
 
 /// Information about an album from a single artist. We guarantee that `self.tracks[i].album ==
 /// self.name && self.tracks[i].artist == self.artist`.
 #[derive(Debug, Clone)]
 pub struct Album {
-    pub id: AlbumId,
+    pub name: AlbumName,
     pub tracks: Vec<Track>,
 }
 
 impl Album {
-    pub fn new(id: AlbumId) -> Self {
-        Self { id, tracks: vec![] }
+    pub fn new(name: AlbumName) -> Self {
+        Self {
+            name,
+            tracks: vec![],
+        }
     }
 }
 
@@ -61,8 +64,8 @@ pub struct Track {
     pub number: Option<u32>,
     pub path: PathBuf,
     pub title: Option<String>,
-    pub album: AlbumId,
-    pub artist: ArtistId,
+    pub album: AlbumName,
+    pub artist: ArtistName,
     pub length: OrderedFloat<f64>,
 }
 
@@ -157,29 +160,29 @@ impl Track {
 
 // miscellaneous impls
 
-impl Display for ArtistId {
+impl Display for ArtistName {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ArtistId::Unknown => "<unknown>".fmt(f),
-            ArtistId::Artist(name) => name.fmt(f),
+            ArtistName::Unknown => "<unknown>".fmt(f),
+            ArtistName::Artist(name) => name.fmt(f),
         }
     }
 }
 
-impl From<Option<String>> for ArtistId {
+impl From<Option<String>> for ArtistName {
     fn from(value: Option<String>) -> Self {
-        value.map_or(ArtistId::Unknown, ArtistId::Artist)
+        value.map_or(ArtistName::Unknown, ArtistName::Artist)
     }
 }
 
-impl Display for AlbumId {
+impl Display for AlbumName {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.0.as_deref().unwrap_or("<unknown>").fmt(f)
     }
 }
 
-impl From<Option<String>> for AlbumId {
+impl From<Option<String>> for AlbumName {
     fn from(value: Option<String>) -> Self {
-        AlbumId(value)
+        AlbumName(value)
     }
 }
