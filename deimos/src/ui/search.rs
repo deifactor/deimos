@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 use itertools::Itertools;
 use ratatui::{
@@ -18,7 +20,7 @@ use super::{ActiveState, DeimosBackend};
 pub enum SearchResult {
     Artist(ArtistName),
     Album(AlbumName, ArtistName),
-    Track(Track),
+    Track(Arc<Track>),
 }
 
 impl SearchResult {
@@ -108,7 +110,6 @@ impl Search {
         let tracks = library
             .tracks()
             .filter(|track| track.title.as_ref().map_or(false, is_match))
-            .cloned()
             .map(SearchResult::Track);
 
         let results = artists.chain(albums).chain(tracks).collect_vec();

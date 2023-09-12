@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 use itertools::Itertools;
 use ratatui::{
@@ -18,7 +20,7 @@ use super::ActiveState;
 #[derive(Debug)]
 pub enum TrackListItem {
     /// An actual track.
-    Track(Track),
+    Track(Arc<Track>),
     /// Section heading. This is not selectable.
     Section(String),
 }
@@ -89,14 +91,14 @@ impl TrackList {
     pub fn select(&mut self, title: &str) {
         self.state
             .select(self.items.iter().position(|track| match track {
-                TrackListItem::Track(Track { title: Some(t), .. }) => t == title,
+                TrackListItem::Track(track) => track.title.as_deref() == Some(title),
                 _ => false,
             }))
     }
 
     pub fn selected(&self) -> Option<&Track> {
         self.state.selected().map(|i| match &self.items[i] {
-            TrackListItem::Track(track) => track,
+            TrackListItem::Track(track) => track.as_ref(),
             _ => panic!("Somehow selected a non-track"),
         })
     }

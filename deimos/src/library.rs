@@ -4,6 +4,7 @@ use ordered_float::OrderedFloat;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::{fs::File, path::Path};
 use symphonia::core::io::MediaSourceStream;
 
@@ -47,7 +48,7 @@ pub struct AlbumName(pub Option<String>);
 #[derive(Debug, Clone)]
 pub struct Album {
     pub name: AlbumName,
-    pub tracks: Vec<Track>,
+    pub tracks: Vec<Arc<Track>>,
 }
 
 impl Album {
@@ -95,7 +96,7 @@ impl Library {
             .entry(track.album.clone())
             .or_insert_with_key(|id| Album::new(id.clone()))
             .tracks;
-        tracks.push(track);
+        tracks.push(Arc::new(track));
         tracks.sort_by_key(|track| track.number);
         Ok(())
     }
@@ -116,8 +117,8 @@ impl Library {
         self.albums_with_artist().map(|(album, _)| album)
     }
 
-    pub fn tracks(&self) -> impl Iterator<Item = &Track> {
-        self.albums().flat_map(|album| album.tracks.iter())
+    pub fn tracks(&self) -> impl Iterator<Item = Arc<Track>> + '_ {
+        self.albums().flat_map(|album| album.tracks.iter()).cloned()
     }
 }
 
