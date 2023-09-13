@@ -59,8 +59,8 @@ impl LibraryPanel {
 
         self.track_list = match self.artist_album_list.album() {
             Some(album) => {
-                let tracks = library.artists[&artist].albums[&album].tracks.clone();
-                TrackList::new(tracks.into_iter().map(TrackListItem::Track).collect())
+                let tracks = &library.artists[&artist].albums[&album].tracks;
+                TrackList::new(tracks.iter().cloned().map(TrackListItem::Track).collect())
             }
             None => {
                 let mut albums = library.artists[&artist]

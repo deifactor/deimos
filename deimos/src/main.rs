@@ -2,6 +2,7 @@ mod app;
 mod decoder;
 mod library;
 mod library_panel;
+mod player;
 mod ui;
 
 use std::{io, panic, path::PathBuf};

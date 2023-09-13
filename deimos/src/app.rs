@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use enum_iterator::next_cycle;
@@ -6,17 +8,17 @@ use ratatui::{
     Frame, Terminal,
 };
 use rodio::Sink;
-use symphonia::core::audio::AudioBuffer;
+
 use tokio::{
     pin,
-    sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+    sync::mpsc::{unbounded_channel, UnboundedReceiver},
 };
 use tokio_stream::{wrappers::UnboundedReceiverStream, Stream, StreamExt};
 
 use crate::{
-    decoder::TrackingSymphoniaDecoder,
     library::{Library, Track},
     library_panel::{LibraryPanel, PanelItem},
+    player::{Player, PlayerMessage},
     ui::{
         artist_album_list::ArtistAlbumList,
         now_playing::{NowPlaying, PlayState},
@@ -35,7 +37,7 @@ pub enum Panel {
 
 pub struct App {
     library: Library,
-    player_sink: Sink,
+    player: Player,
     library_panel: LibraryPanel,
     now_playing: NowPlaying,
     visualizer: Visualizer,
@@ -43,13 +45,16 @@ pub struct App {
     active_panel: Panel,
     ui: Ui,
     should_quit: bool,
+
+    rx_message: Option<UnboundedReceiver<Message>>,
 }
 
 impl App {
-    pub fn new(library: Library, player_sink: Sink) -> Self {
+    pub fn new(library: Library, sink: Sink) -> Self {
+        let (tx_message, rx_message) = unbounded_channel::<Message>();
         Self {
             library,
-            player_sink,
+            player: Player::new(sink, tx_message),
             library_panel: LibraryPanel::default(),
             now_playing: NowPlaying::default(),
             visualizer: Visualizer::default(),
@@ -57,6 +62,8 @@ impl App {
             active_panel: Panel::Library,
             ui: Ui::default(),
             should_quit: false,
+
+            rx_message: Some(rx_message),
         }
     }
 
@@ -67,13 +74,12 @@ impl App {
     ) -> Result<()> {
         self.library_panel.artist_album_list = ArtistAlbumList::new(&self.library);
 
-        let (tx_message, rx_message) = unbounded_channel::<Message>();
         pin!(terminal_events);
 
-        let mut event_stream = AppEvent::stream(terminal_events, rx_message);
+        let mut event_stream = AppEvent::stream(terminal_events, self.rx_message.take().unwrap());
 
         while let Some(event) = event_stream.next().await {
-            self.handle_event(event, &tx_message)?;
+            self.handle_event(event)?;
             terminal.draw(|f| self.draw(f).expect("failed to rerender app"))?;
             if self.should_quit {
                 return Ok(());
@@ -83,20 +89,16 @@ impl App {
         Ok(())
     }
 
-    fn handle_event(
-        &mut self,
-        event: AppEvent,
-        tx_message: &UnboundedSender<Message>,
-    ) -> Result<()> {
+    fn handle_event(&mut self, event: AppEvent) -> Result<()> {
         match event {
             AppEvent::Terminal(terminal_event) => {
                 if let Some(message) = self.handle_terminal(terminal_event) {
-                    self.dispatch(message, tx_message)
+                    self.dispatch(message)
                 } else {
                     Ok(())
                 }
             }
-            AppEvent::Message(message) => self.dispatch(message, tx_message),
+            AppEvent::Message(message) => self.dispatch(message),
         }
     }
 
@@ -137,12 +139,11 @@ pub enum Message {
     StartSearch,
     MoveCursor(Motion),
     ToggleArtistAlbumList,
-    SetNowPlaying(Option<PlayState>),
-    UpdateSpectrum(AudioBuffer<f32>),
     SetSearchQuery(String),
     SelectEntity(SearchResult),
-    PlayTrack(Track),
+    PlayTrack(Arc<Track>),
     SetFocus(PanelItem),
+    Player(PlayerMessage),
     Quit,
 }
 
@@ -179,7 +180,8 @@ impl App {
         };
         Some(message)
     }
-    fn dispatch(&mut self, message: Message, tx_message: &UnboundedSender<Message>) -> Result<()> {
+
+    fn dispatch(&mut self, message: Message) -> Result<()> {
         use Message::*;
         match message {
             StartSearch => {
@@ -191,30 +193,12 @@ impl App {
                 let results = Search::run_search_query(&self.library, self.search.query())?;
                 self.search.set_results(results);
             }
-            SetNowPlaying(play_state) => self.now_playing.play_state = play_state,
-            UpdateSpectrum(buf) => {
-                self.visualizer.update_spectrum(buf).unwrap();
-            }
             SelectEntity(result) => {
                 self.active_panel = Panel::Library;
                 self.library_panel.select_entity(&self.library, &result)?;
             }
             PlayTrack(track) => {
-                let tx_message = tx_message.clone();
-                let decoder = TrackingSymphoniaDecoder::from_path(&track.path)?.with_callback(
-                    move |buffer, timestamp| {
-                        tx_message
-                            .send(Message::SetNowPlaying(Some(PlayState {
-                                timestamp,
-                                track: track.clone(),
-                            })))
-                            .unwrap();
-                        tx_message.send(Message::UpdateSpectrum(buffer)).unwrap();
-                    },
-                );
-                self.player_sink.stop();
-                self.player_sink.append(decoder);
-                self.player_sink.play();
+                self.player.play_track(track)?;
             }
             Quit => self.should_quit = true,
             MoveCursor(motion) => {
@@ -233,6 +217,24 @@ impl App {
                 self.library_panel.focus = focus;
             }
             ToggleArtistAlbumList => self.library_panel.artist_album_list.toggle(),
+            Player(message) => {
+                self.dispatch_player_message(message)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn dispatch_player_message(&mut self, message: PlayerMessage) -> Result<()> {
+        match message {
+            PlayerMessage::TrackFinished => todo!(),
+            PlayerMessage::Decoded {
+                track,
+                timestamp,
+                buffer,
+            } => {
+                self.now_playing.play_state = Some(PlayState { timestamp, track });
+                self.visualizer.update_spectrum(buffer)?;
+            }
         }
         Ok(())
     }
@@ -249,7 +251,6 @@ impl App {
                         .library_panel
                         .track_list
                         .selected()
-                        .cloned()
                         .map(Message::PlayTrack)?,
                 },
                 Panel::Search => self.search.selected_result().map(Message::SelectEntity)?,

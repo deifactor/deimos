@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout},
@@ -10,7 +10,7 @@ use crate::library::Track;
 #[derive(Debug, PartialEq, Eq)]
 pub struct PlayState {
     pub timestamp: Duration,
-    pub track: Track,
+    pub track: Arc<Track>,
 }
 
 #[derive(Debug, Default)]

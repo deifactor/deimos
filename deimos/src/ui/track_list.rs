@@ -96,9 +96,9 @@ impl TrackList {
             }))
     }
 
-    pub fn selected(&self) -> Option<&Track> {
+    pub fn selected(&self) -> Option<Arc<Track>> {
         self.state.selected().map(|i| match &self.items[i] {
-            TrackListItem::Track(track) => track.as_ref(),
+            TrackListItem::Track(track) => track.clone(),
             _ => panic!("Somehow selected a non-track"),
         })
     }
