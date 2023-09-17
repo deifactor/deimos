@@ -6,8 +6,9 @@ use std::{
 use anyhow::{Context, Result};
 use cpal::{
     traits::{DeviceTrait, HostTrait},
-    Sample, Stream,
+    Device, Stream,
 };
+use itertools::Itertools;
 use symphonia::core::audio::{AudioBuffer, SampleBuffer};
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -18,10 +19,11 @@ use self::reader::{Fragment, SymphoniaReader};
 mod reader;
 
 pub struct Player {
-    source: Arc<Mutex<Option<Source>>>,
+    reader: Option<Arc<Mutex<SymphoniaReader>>>,
     tx_message: UnboundedSender<Message>,
-    #[allow(dead_code)]
-    stream: Stream,
+    stream: Option<Stream>,
+
+    device: Device,
 }
 
 pub enum PlayerMessage {
@@ -38,37 +40,19 @@ impl Player {
         let device = host
             .default_output_device()
             .context("no default output device")?;
-        let config = device.default_output_config()?.config();
-        let source = Arc::new(Mutex::new(None as Option<Source>));
-        let stream_source = Arc::clone(&source);
-        let stream = device.build_output_stream(
-            &config,
-            move |data: &mut [f32], _| {
-                if let Some(source) = stream_source.lock().unwrap().as_mut() {
-                    for (dst, src) in data.iter_mut().zip(source) {
-                        *dst = src;
-                    }
-                } else {
-                    data.fill(0.);
-                }
-            },
-            move |e| {
-                dbg!(e);
-            },
-            None,
-        )?;
-
         Ok(Self {
-            source,
+            reader: None,
             tx_message,
-            stream,
+            stream: None,
+            device,
         })
     }
 
     pub fn play_track(&mut self, track: Arc<Track>) -> Result<()> {
-        let mut source = self.source.lock().unwrap();
+        let reader = Arc::new(Mutex::new(SymphoniaReader::from_path(&track.path)?));
+        self.reader = Some(Arc::clone(&reader));
+
         let tx_message = self.tx_message.clone();
-        let path = track.path.clone();
         let on_decode: DecodeCallback = Box::new(move |fragment| {
             let _ = tx_message.send(Message::Player(PlayerMessage::AudioFragment {
                 buffer: fragment.buffer,
@@ -77,11 +61,27 @@ impl Player {
             }));
         });
         let on_finish: FinishCallback = Box::new(|| ());
-        *source = Some(Source::new(
-            SymphoniaReader::from_path(path)?,
-            on_decode,
-            on_finish,
-        ));
+
+        // get an iterator over the raw samples
+        let source = Source::new(reader, on_decode, on_finish);
+        let mut sample_iter = source
+            .flat_map(|samples| samples.samples().iter().copied().collect_vec())
+            .fuse();
+
+        let config = self.device.default_output_config()?.config();
+        let stream = self.device.build_output_stream(
+            &config,
+            move |data: &mut [f32], _| {
+                for (dst, src) in data.iter_mut().zip(sample_iter.by_ref()) {
+                    *dst = src
+                }
+            },
+            |e| {
+                dbg!(e);
+            },
+            None,
+        )?;
+        self.stream = Some(stream);
         Ok(())
     }
 }
@@ -89,72 +89,48 @@ impl Player {
 type DecodeCallback = Box<dyn FnMut(Fragment) + Send + 'static>;
 type FinishCallback = Box<dyn FnOnce() + Send + 'static>;
 
-/// Yields the individual samples from the [`SymphoniaReader`]. The iterator implementation never
-/// finishes; instead, after it's done, it continually yields silence.
+/// Wraps a [`SymphoniaReader`] in order to invoke callbacks. This takes out a lock on the
+/// reader when it needs to decode a new buffer.
 struct Source {
-    pub reader: SymphoniaReader,
-    /// Outside of the constructor, `None` means that there are no samples left.
-    buffer: Option<SampleBuffer<f32>>,
+    reader: Arc<Mutex<SymphoniaReader>>,
+    /// Invoked every time the inner reader decodes another sample buffer.
     on_decode: DecodeCallback,
+    /// Invoked at most once when the inner reader has a (non-retryable) decode failure.
     on_finish: Option<FinishCallback>,
-    offset: usize,
 }
 
 impl Source {
-    fn new(reader: SymphoniaReader, on_decode: DecodeCallback, on_finish: FinishCallback) -> Self {
-        let mut source = Self {
+    fn new(
+        reader: Arc<Mutex<SymphoniaReader>>,
+        on_decode: DecodeCallback,
+        on_finish: FinishCallback,
+    ) -> Self {
+        Self {
             reader,
-            buffer: None,
             on_decode,
             on_finish: Some(on_finish),
-            offset: 0,
-        };
-        source.decode();
-        source
-    }
-
-    fn decode(&mut self) {
-        self.offset = 0;
-
-        match self.reader.next() {
-            Some(fragment) => {
-                let mut sample_buffer =
-                    SampleBuffer::new(fragment.buffer.capacity() as u64, *fragment.buffer.spec());
-                sample_buffer.copy_interleaved_typed(&fragment.buffer);
-                self.buffer = Some(sample_buffer);
-                (self.on_decode)(fragment);
-            }
-            None => {
-                self.buffer = None;
-                if let Some(f) = self.on_finish.take() {
-                    f()
-                }
-            }
-        }
-    }
-
-    /// True if we need to call decode() before we can try to get a sample.
-    fn needs_decode(&self) -> bool {
-        match self.buffer.as_ref() {
-            Some(buffer) => self.offset > buffer.len() - 1,
-            None => true,
         }
     }
 }
 
 impl Iterator for Source {
-    type Item = f32;
+    type Item = SampleBuffer<f32>;
 
-    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if self.needs_decode() {
-            self.decode();
+        match self.reader.lock().unwrap().next() {
+            Some(fragment) => {
+                let buffer = &fragment.buffer;
+                let mut samples = SampleBuffer::new(buffer.capacity() as u64, *buffer.spec());
+                samples.copy_planar_typed(buffer);
+                (self.on_decode)(fragment);
+                Some(samples)
+            }
+            None => {
+                if let Some(f) = self.on_finish.take() {
+                    f()
+                }
+                None
+            }
         }
-        let Some(buffer) = self.buffer.as_ref() else {
-            return Some(f32::EQUILIBRIUM);
-        };
-        let val = buffer.samples()[self.offset];
-        self.offset += 1;
-        Some(val)
     }
 }
