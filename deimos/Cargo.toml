@@ -8,13 +8,13 @@ repository = "http://github.com/deifactor/deimos"
 
 [dependencies]
 anyhow = { version = "1.0.71", features = ["backtrace"] }
+cpal = "0.15.2"
 crossterm = { version = "0.26.1", features = ["event-stream"] }
 enum-iterator = "1.4.1"
 itertools = "0.11.0"
 lofty = "0.15.0"
 ordered-float = "3.7.0"
 ratatui = { version = "0.21.0", features = ["macros"] }
-rodio = { version = "0.17.1", default-features = false, features = ["symphonia-all"] }
 spectrum-analyzer = "1.4.0"
 symphonia = { version = "0.5.3", features = ["all"] }
 tap = "1.0.1"

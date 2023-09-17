@@ -7,7 +7,6 @@ use ratatui::{
     layout::{Constraint, Direction, Layout},
     Frame, Terminal,
 };
-use rodio::Sink;
 
 use tokio::{
     pin,
@@ -16,9 +15,9 @@ use tokio::{
 use tokio_stream::{wrappers::UnboundedReceiverStream, Stream, StreamExt};
 
 use crate::{
+    audio::{Player, PlayerMessage},
     library::{Library, Track},
     library_panel::{LibraryPanel, PanelItem},
-    player::{Player, PlayerMessage},
     ui::{
         artist_album_list::ArtistAlbumList,
         now_playing::{NowPlaying, PlayState},
@@ -50,11 +49,11 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(library: Library, sink: Sink) -> Self {
-        let (tx_message, rx_message) = unbounded_channel::<Message>();
+    pub fn new(library: Library) -> Self {
+        let (_tx_message, rx_message) = unbounded_channel::<Message>();
         Self {
             library,
-            player: Player::new(sink, tx_message),
+            player: Player::new(_tx_message).unwrap(),
             library_panel: LibraryPanel::default(),
             now_playing: NowPlaying::default(),
             visualizer: Visualizer::default(),
@@ -217,21 +216,11 @@ impl App {
                 self.library_panel.focus = focus;
             }
             ToggleArtistAlbumList => self.library_panel.artist_album_list.toggle(),
-            Player(message) => {
-                self.dispatch_player_message(message)?;
-            }
-        }
-        Ok(())
-    }
-
-    fn dispatch_player_message(&mut self, message: PlayerMessage) -> Result<()> {
-        match message {
-            PlayerMessage::TrackFinished => todo!(),
-            PlayerMessage::Decoded {
-                track,
-                timestamp,
+            Player(PlayerMessage::AudioFragment {
                 buffer,
-            } => {
+                timestamp,
+                track,
+            }) => {
                 self.now_playing.play_state = Some(PlayState { timestamp, track });
                 self.visualizer.update_spectrum(buffer)?;
             }

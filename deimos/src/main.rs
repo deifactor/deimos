@@ -1,8 +1,7 @@
 mod app;
-mod decoder;
+mod audio;
 mod library;
 mod library_panel;
-mod player;
 mod ui;
 
 use std::{io, panic, path::PathBuf};
@@ -18,7 +17,6 @@ use crossterm::{
 use library::Library;
 use ratatui::{backend::CrosstermBackend, Terminal};
 
-use rodio::{OutputStream, Sink};
 use tokio_stream::StreamExt;
 
 #[tokio::main]
@@ -26,9 +24,7 @@ async fn main() -> Result<()> {
     let terminal = prepare_terminal()?;
     let library = Library::scan(PathBuf::from("/home/vector/music"))?;
 
-    let (_output_stream, output_stream_handle) = OutputStream::try_default()?;
-    let sink = Sink::try_new(&output_stream_handle)?;
-    let app = App::new(library, sink);
+    let app = App::new(library);
 
     app.run(EventStream::new().filter_map(|ev| ev.ok()), terminal)
         .await?;
