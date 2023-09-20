@@ -72,7 +72,6 @@ impl SymphoniaReader {
         let timestamp = Duration::from_secs_f64(timestamp.seconds as f64 + timestamp.frac);
 
         let decoded = self.decoder.decode(&packet)?;
-        dbg!(decoded.spec());
         let mut buffer = decoded.make_equivalent::<f32>();
         decoded.convert(&mut buffer);
 
