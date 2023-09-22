@@ -60,14 +60,6 @@ impl Search {
         &self.query
     }
 
-    pub fn set_query(&mut self, query: String) {
-        self.query = query;
-    }
-
-    pub fn set_results(&mut self, results: Vec<SearchResult>) {
-        self.results = results;
-    }
-
     pub fn selected_result(&self) -> Option<SearchResult> {
         self.results.get(0).cloned()
     }
@@ -85,11 +77,10 @@ impl Search {
         }
     }
 
-    pub fn run_search_query(
-        library: &Library,
-        query: impl AsRef<str>,
-    ) -> Result<Vec<SearchResult>> {
+    pub fn run_query(&mut self, library: &Library, query: impl AsRef<str>) -> Result<()> {
         let query = query.as_ref();
+        self.query = query.to_owned();
+
         // XXX: this isn't right. use regex
         let is_match = |haystack: &String| haystack.to_lowercase().contains(&query.to_lowercase());
         let artists = library
@@ -112,9 +103,9 @@ impl Search {
             .filter(|track| track.title.as_ref().map_or(false, is_match))
             .map(SearchResult::Track);
 
-        let results = artists.chain(albums).chain(tracks).collect_vec();
+        self.results = artists.chain(albums).chain(tracks).collect_vec();
 
-        Ok(results)
+        Ok(())
     }
 
     pub fn draw(

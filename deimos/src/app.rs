@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
@@ -16,12 +16,12 @@ use tokio_stream::{wrappers::UnboundedReceiverStream, Stream, StreamExt};
 
 use crate::{
     audio::{Player, PlayerMessage},
-    library::{Library, Track},
+    library::Library,
     library_panel::{LibraryPanel, PanelItem},
     ui::{
         artist_album_list::ArtistAlbumList,
         now_playing::{NowPlaying, PlayState},
-        search::{Search, SearchResult},
+        search::Search,
         spectrogram::Visualizer,
         DeimosBackend, Ui,
     },
@@ -78,7 +78,13 @@ impl App {
         let mut event_stream = AppEvent::stream(terminal_events, self.rx_message.take().unwrap());
 
         while let Some(event) = event_stream.next().await {
-            self.handle_event(event)?;
+            let message = match event {
+                AppEvent::Terminal(terminal_event) => self.lookup_binding(terminal_event),
+                AppEvent::Message(message) => Some(message),
+            };
+            if let Some(message) = message {
+                self.dispatch(message)?;
+            }
             terminal.draw(|f| self.draw(f).expect("failed to rerender app"))?;
             if self.should_quit {
                 return Ok(());
@@ -86,19 +92,6 @@ impl App {
         }
 
         Ok(())
-    }
-
-    fn handle_event(&mut self, event: AppEvent) -> Result<()> {
-        match event {
-            AppEvent::Terminal(terminal_event) => {
-                if let Some(message) = self.handle_terminal(terminal_event) {
-                    self.dispatch(message)
-                } else {
-                    Ok(())
-                }
-            }
-            AppEvent::Message(message) => self.dispatch(message),
-        }
     }
 
     pub fn draw(&mut self, f: &mut Frame<'_, DeimosBackend>) -> Result<()> {
@@ -119,10 +112,9 @@ impl App {
         Ok(())
     }
 
-    fn handle_terminal(&self, ev: Event) -> Option<Message> {
+    fn lookup_binding(&self, ev: Event) -> Option<Message> {
         let Event::Key(KeyEvent { code, kind: KeyEventKind::Press, .. }) = ev else { return None };
-        self.key_to_command(code)
-            .and_then(|cmd| self.dispatch_command(cmd))
+        self.key_to_command(code).map(Message::Command)
     }
 }
 
@@ -135,25 +127,17 @@ pub enum Motion {
 /// An [`message`] corresponds to a mutation of the application state. All mutation of application
 /// state should be done through messages.
 pub enum Message {
-    StartSearch,
-    MoveCursor(Motion),
-    ToggleArtistAlbumList,
-    SetSearchQuery(String),
-    SelectEntity(SearchResult),
-    PlayTrack(Arc<Track>),
-    SetFocus(PanelItem),
+    Command(Command),
     Player(PlayerMessage),
-    Seek(i64),
-    Quit,
 }
 
 /// A [`Command`] corresponds to a single user input. The translation of keys to commands is done
 /// by a match statement on (active panel, keycode).
 pub enum Command {
+    /// Start a new search query.
+    StartSearch,
     /// Move focus to the next item in the panel.
     NextFocus,
-    /// Start a new search.
-    StartSearch,
     /// Perform an message on the currently-selected item.
     Activate,
     /// Move the current selection.
@@ -188,21 +172,41 @@ impl App {
     fn dispatch(&mut self, message: Message) -> Result<()> {
         use Message::*;
         match message {
+            Command(command) => {
+                self.dispatch_command(command)?;
+            }
+
+            Player(PlayerMessage::AudioFragment {
+                buffer,
+                timestamp,
+                track,
+            }) => {
+                self.now_playing.play_state = Some(PlayState { timestamp, track });
+                self.visualizer.update_spectrum(buffer)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn dispatch_command(&mut self, command: Command) -> Result<()> {
+        use Command::*;
+        match command {
             StartSearch => {
                 self.active_panel = Panel::Search;
                 self.search = Search::default();
             }
-            SetSearchQuery(query) => {
-                self.search.set_query(query);
-                let results = Search::run_search_query(&self.library, self.search.query())?;
-                self.search.set_results(results);
+            SearchInput(c) => {
+                self.search
+                    .run_query(&self.library, format!("{}{}", self.search.query(), c))?;
             }
-            SelectEntity(result) => {
-                self.active_panel = Panel::Library;
-                self.library_panel.select_entity(&self.library, &result)?;
+            SearchBackspace => {
+                let mut chars = self.search.query().chars();
+                chars.next_back();
+                let query = chars.as_str().to_owned();
+                self.search.run_query(&self.library, query)?;
             }
-            PlayTrack(track) => {
-                self.player.play_track(track)?;
+            Activate => {
+                self.activate_item()?;
             }
             Quit => self.should_quit = true,
             MoveCursor(motion) => {
@@ -217,17 +221,8 @@ impl App {
                     Panel::Search => todo!(),
                 }
             }
-            SetFocus(focus) => {
-                self.library_panel.focus = focus;
-            }
-            ToggleArtistAlbumList => self.library_panel.artist_album_list.toggle(),
-            Player(PlayerMessage::AudioFragment {
-                buffer,
-                timestamp,
-                track,
-            }) => {
-                self.now_playing.play_state = Some(PlayState { timestamp, track });
-                self.visualizer.update_spectrum(buffer)?;
+            NextFocus => {
+                self.library_panel.focus = next_cycle(&self.library_panel.focus).unwrap();
             }
             Seek(seconds) => {
                 let Some(now) = self.now_playing.play_state.as_ref().map(|s| s.timestamp) else { return Ok(()) };
@@ -242,32 +237,24 @@ impl App {
         Ok(())
     }
 
-    fn dispatch_command(&self, command: Command) -> Option<Message> {
-        use Command::*;
-        Some(match command {
-            NextFocus => Message::SetFocus(next_cycle(&self.library_panel.focus).unwrap()),
-            StartSearch => Message::StartSearch,
-            Activate => match self.active_panel {
-                Panel::Library => match self.library_panel.focus {
-                    PanelItem::ArtistAlbumList => Message::ToggleArtistAlbumList,
-                    PanelItem::TrackList => self
-                        .library_panel
-                        .track_list
-                        .selected()
-                        .map(Message::PlayTrack)?,
-                },
-                Panel::Search => self.search.selected_result().map(Message::SelectEntity)?,
+    fn activate_item(&mut self) -> Result<()> {
+        match self.active_panel {
+            Panel::Library => match self.library_panel.focus {
+                PanelItem::ArtistAlbumList => {
+                    self.library_panel.artist_album_list.toggle();
+                }
+                PanelItem::TrackList => {
+                    let Some(selected) = self.library_panel.track_list.selected() else { return Ok(()) };
+                    self.player.play_track(selected)?;
+                }
             },
-            MoveCursor(motion) => Message::MoveCursor(motion),
-            SearchInput(c) => Message::SetSearchQuery(format!("{}{}", self.search.query(), c)),
-            SearchBackspace => {
-                let mut chars = self.search.query().chars();
-                chars.next_back();
-                Message::SetSearchQuery(chars.as_str().to_owned())
+            Panel::Search => {
+                let Some(selected) = self.search.selected_result() else { return Ok(()) };
+                self.active_panel = Panel::Library;
+                self.library_panel.select_entity(&self.library, &selected)?;
             }
-            Seek(secs) => Message::Seek(secs),
-            Quit => Message::Quit,
-        })
+        }
+        Ok(())
     }
 }
 
