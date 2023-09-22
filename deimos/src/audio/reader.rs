@@ -5,10 +5,11 @@ use symphonia::{
     core::{
         audio::AudioBuffer,
         codecs::{Decoder, DecoderOptions},
-        formats::{FormatOptions, FormatReader},
+        formats::{FormatOptions, FormatReader, SeekMode, SeekTo},
         io::MediaSourceStream,
         meta::MetadataOptions,
         probe::Hint,
+        units::Time,
     },
     default::get_probe,
 };
@@ -76,6 +77,19 @@ impl SymphoniaReader {
         decoded.convert(&mut buffer);
 
         Ok(Fragment { buffer, timestamp })
+    }
+
+    pub(super) fn seek(&mut self, target: Duration) -> Result<()> {
+        let target = Time::new(target.as_secs(), target.as_secs_f64().fract());
+        self.format.seek(
+            SeekMode::Accurate,
+            SeekTo::Time {
+                time: target,
+                track_id: None,
+            },
+        )?;
+        self.decoder.reset();
+        Ok(())
     }
 }
 

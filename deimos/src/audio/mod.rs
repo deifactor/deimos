@@ -84,6 +84,13 @@ impl Player {
         self.stream = Some(stream);
         Ok(())
     }
+
+    /// Seek to the given timestamp. Does nothing if there's no currently-playing track.
+    pub fn seek(&mut self, target: Duration) -> Result<()> {
+        let Some(reader) = self.reader.as_mut() else { return Ok(()) };
+        let mut reader = reader.lock().unwrap();
+        reader.seek(target)
+    }
 }
 
 type DecodeCallback = Box<dyn FnMut(Fragment) + Send + 'static>;

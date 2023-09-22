@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
@@ -143,6 +143,7 @@ pub enum Message {
     PlayTrack(Arc<Track>),
     SetFocus(PanelItem),
     Player(PlayerMessage),
+    Seek(i64),
     Quit,
 }
 
@@ -161,6 +162,8 @@ pub enum Command {
     SearchInput(char),
     /// Deletes the most recent character in the search input.
     SearchBackspace,
+    /// Seeks the current song by the given amount.
+    Seek(i64),
     Quit,
 }
 
@@ -175,6 +178,8 @@ impl App {
             (_, KeyCode::Up) => Command::MoveCursor(Motion::Up),
             (_, KeyCode::Down) => Command::MoveCursor(Motion::Down),
             (_, KeyCode::Enter) => Command::Activate,
+            (_, KeyCode::Char(',')) => Command::Seek(-5),
+            (_, KeyCode::Char('.')) => Command::Seek(5),
             _ => return None,
         };
         Some(message)
@@ -224,6 +229,15 @@ impl App {
                 self.now_playing.play_state = Some(PlayState { timestamp, track });
                 self.visualizer.update_spectrum(buffer)?;
             }
+            Seek(seconds) => {
+                let Some(now) = self.now_playing.play_state.as_ref().map(|s| s.timestamp) else { return Ok(()) };
+                let target = if seconds > 0 {
+                    now + Duration::from_secs(seconds.unsigned_abs())
+                } else {
+                    now - Duration::from_secs(seconds.unsigned_abs())
+                };
+                self.player.seek(target)?;
+            }
         }
         Ok(())
     }
@@ -251,6 +265,7 @@ impl App {
                 chars.next_back();
                 Message::SetSearchQuery(chars.as_str().to_owned())
             }
+            Seek(secs) => Message::Seek(secs),
             Quit => Message::Quit,
         })
     }
