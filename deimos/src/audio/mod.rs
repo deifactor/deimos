@@ -128,7 +128,7 @@ impl Iterator for Source {
             Some(fragment) => {
                 let buffer = &fragment.buffer;
                 let mut samples = SampleBuffer::new(buffer.capacity() as u64, *buffer.spec());
-                samples.copy_planar_typed(buffer);
+                samples.copy_interleaved_typed(buffer);
                 (self.on_decode)(fragment);
                 Some(samples)
             }
