@@ -1,8 +1,11 @@
 use anyhow::{Context, Result};
+use itertools::Itertools;
 use lofty::{Accessor, ItemKey, TaggedFileExt};
 use ordered_float::OrderedFloat;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
+use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::{fs::File, path::Path};
@@ -17,7 +20,7 @@ pub struct Library {
 }
 
 // Intentionally *not* `Option<String>` so that we can support "Various Artists" later.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize, Serialize)]
 pub enum ArtistName {
     Unknown,
     Artist(String),
@@ -40,12 +43,12 @@ impl Artist {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord, Hash, Deserialize, Serialize)]
 pub struct AlbumName(pub Option<String>);
 
 /// Information about an album from a single artist. We guarantee that `self.tracks[i].album ==
 /// self.name && self.tracks[i].artist == self.artist`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Album {
     pub name: AlbumName,
     pub tracks: Vec<Arc<Track>>,
@@ -60,7 +63,7 @@ impl Album {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
 pub struct Track {
     pub number: Option<u32>,
     pub path: PathBuf,
@@ -71,6 +74,23 @@ pub struct Track {
 }
 
 impl Library {
+    /// Loads the library from disk. A library is serialized as a list of tracks.
+    pub fn load(path: impl AsRef<Path>) -> Result<Self> {
+        let tracks: Vec<Track> = serde_json::from_slice(fs::read(path)?.as_slice())?;
+        let mut library = Self::default();
+        for track in tracks {
+            library.insert_track(track)?;
+        }
+        Ok(library)
+    }
+
+    /// Serializes the library to disk. A library is serialized as a list of tracks.
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
+        let tracks = self.tracks().collect_vec();
+        fs::write(path, serde_json::to_vec(&tracks)?.as_slice())?;
+        Ok(())
+    }
+
     /// Scan the given path for music, initializing it as we go.
     pub fn scan(path: impl AsRef<Path>) -> Result<Self> {
         let mut library = Self::default();

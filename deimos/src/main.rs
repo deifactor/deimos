@@ -21,10 +21,17 @@ use tokio_stream::StreamExt;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let terminal = prepare_terminal()?;
-    let library = Library::scan(PathBuf::from("/home/vector/music"))?;
+    let library_path = PathBuf::from("library.json");
+    let library = Library::load(&library_path).or_else(|_| {
+        let library = Library::scan(PathBuf::from("/home/vector/music"))?;
+        let _ = library.save(&library_path)?;
+        anyhow::Ok(library)
+    })?;
 
     let app = App::new(library);
+
+    // do this late as we can so that errors won't get mangled
+    let terminal = prepare_terminal()?;
 
     app.run(EventStream::new().filter_map(|ev| ev.ok()), terminal)
         .await?;
