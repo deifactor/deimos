@@ -4,11 +4,7 @@ pub mod search;
 pub mod spectrogram;
 pub mod track_list;
 
-use ratatui::{
-    backend::CrosstermBackend,
-    style::{Color, Modifier, Style},
-};
-use std::io::Stdout;
+use ratatui::style::{Color, Modifier, Style};
 
 #[derive(Debug, Default)]
 pub struct Ui {
@@ -42,9 +38,6 @@ impl Ui {
         }
     }
 }
-
-/// The type of the ratatui backend we use. We use a fixed backend so that [`Component`] doesn't have any generics, making it object-safe.
-pub type DeimosBackend = CrosstermBackend<Stdout>;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ActiveState {

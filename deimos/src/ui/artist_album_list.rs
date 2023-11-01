@@ -11,7 +11,7 @@ use ratatui::{
 
 use crate::{
     library::{AlbumName, ArtistName, Library},
-    ui::{DeimosBackend, Ui},
+    ui::Ui,
 };
 
 use super::ActiveState;
@@ -102,7 +102,9 @@ impl ArtistAlbumList {
 
     /// Toggles whether the currently selected artist is expanded. Adjusts the selection as necessary.
     pub fn toggle(&mut self) {
-        let Some(selected) = self.selected else { return; };
+        let Some(selected) = self.selected else {
+            return;
+        };
         let RowIndex { artist, .. } = self.rows[selected];
         if self.expanded.contains(&artist) {
             self.expanded.remove(&artist);
@@ -175,7 +177,7 @@ impl ArtistAlbumList {
         &mut self,
         state: ActiveState,
         ui: &Ui,
-        frame: &mut Frame<DeimosBackend>,
+        frame: &mut Frame,
         area: Rect,
     ) -> Result<()> {
         let block = Block::default()

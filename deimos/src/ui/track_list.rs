@@ -9,10 +9,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::{
-    library::Track,
-    ui::{DeimosBackend, Ui},
-};
+use crate::{library::Track, ui::Ui};
 
 use super::ActiveState;
 
@@ -107,7 +104,7 @@ impl TrackList {
         &mut self,
         state: ActiveState,
         ui: &Ui,
-        frame: &mut Frame<DeimosBackend>,
+        frame: &mut Frame,
         area: Rect,
     ) -> Result<()> {
         let block = Block::default()

@@ -11,7 +11,7 @@ use ratatui::{
 
 use crate::library::{AlbumName, ArtistName, Library, Track};
 
-use super::{ActiveState, DeimosBackend};
+use super::ActiveState;
 
 /// Searches the library. Searches in album names, artist names, and track names.
 
@@ -108,12 +108,7 @@ impl Search {
         Ok(())
     }
 
-    pub fn draw(
-        &mut self,
-        ui: &super::Ui,
-        frame: &mut Frame<DeimosBackend>,
-        area: Rect,
-    ) -> Result<()> {
+    pub fn draw(&mut self, ui: &super::Ui, frame: &mut Frame, area: Rect) -> Result<()> {
         let block = Block::default()
             .title("Search")
             .borders(Borders::ALL)

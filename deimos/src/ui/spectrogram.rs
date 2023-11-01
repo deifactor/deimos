@@ -129,7 +129,7 @@ impl Visualizer {
     pub fn draw(
         &mut self,
         _ui: &crate::ui::Ui,
-        frame: &mut ratatui::Frame<crate::ui::DeimosBackend>,
+        frame: &mut ratatui::Frame,
         area: ratatui::layout::Rect,
     ) -> Result<()> {
         let width = area.width as i32;

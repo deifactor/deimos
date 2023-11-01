@@ -1,9 +1,10 @@
-use std::time::Duration;
+use std::{io::Stdout, time::Duration};
 
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use enum_iterator::next_cycle;
 use ratatui::{
+    backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     Frame, Terminal,
 };
@@ -23,7 +24,7 @@ use crate::{
         now_playing::{NowPlaying, PlayState},
         search::Search,
         spectrogram::Visualizer,
-        DeimosBackend, Ui,
+        Ui,
     },
 };
 
@@ -69,7 +70,7 @@ impl App {
     pub async fn run(
         mut self,
         terminal_events: impl Stream<Item = Event> + Send + Sync + 'static,
-        mut terminal: Terminal<DeimosBackend>,
+        mut terminal: Terminal<CrosstermBackend<Stdout>>,
     ) -> Result<()> {
         self.library_panel.artist_album_list = ArtistAlbumList::new(&self.library);
 
@@ -94,7 +95,7 @@ impl App {
         Ok(())
     }
 
-    pub fn draw(&mut self, f: &mut Frame<'_, DeimosBackend>) -> Result<()> {
+    pub fn draw(&mut self, f: &mut Frame) -> Result<()> {
         let root = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Min(10), Constraint::Max(6)])
@@ -113,7 +114,14 @@ impl App {
     }
 
     fn lookup_binding(&self, ev: Event) -> Option<Message> {
-        let Event::Key(KeyEvent { code, kind: KeyEventKind::Press, .. }) = ev else { return None };
+        let Event::Key(KeyEvent {
+            code,
+            kind: KeyEventKind::Press,
+            ..
+        }) = ev
+        else {
+            return None;
+        };
         self.key_to_command(code).map(Message::Command)
     }
 }
@@ -225,7 +233,9 @@ impl App {
                 self.library_panel.focus = next_cycle(&self.library_panel.focus).unwrap();
             }
             Seek(seconds) => {
-                let Some(now) = self.now_playing.play_state.as_ref().map(|s| s.timestamp) else { return Ok(()) };
+                let Some(now) = self.now_playing.play_state.as_ref().map(|s| s.timestamp) else {
+                    return Ok(());
+                };
                 let target = if seconds > 0 {
                     now + Duration::from_secs(seconds.unsigned_abs())
                 } else {
@@ -244,12 +254,16 @@ impl App {
                     self.library_panel.artist_album_list.toggle();
                 }
                 PanelItem::TrackList => {
-                    let Some(selected) = self.library_panel.track_list.selected() else { return Ok(()) };
+                    let Some(selected) = self.library_panel.track_list.selected() else {
+                        return Ok(());
+                    };
                     self.player.play_track(selected)?;
                 }
             },
             Panel::Search => {
-                let Some(selected) = self.search.selected_result() else { return Ok(()) };
+                let Some(selected) = self.search.selected_result() else {
+                    return Ok(());
+                };
                 self.active_panel = Panel::Library;
                 self.library_panel.select_entity(&self.library, &selected)?;
             }

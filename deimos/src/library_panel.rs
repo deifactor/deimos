@@ -9,7 +9,7 @@ use crate::{
         artist_album_list::ArtistAlbumList,
         search::SearchResult,
         track_list::{TrackList, TrackListItem},
-        ActiveState, DeimosBackend, Ui,
+        ActiveState, Ui,
     },
 };
 
@@ -54,7 +54,7 @@ impl LibraryPanel {
 
     fn update_track_list(&mut self, library: &Library) -> Result<()> {
         let Some(artist) = self.artist_album_list.artist() else {
-            return Ok(())
+            return Ok(());
         };
 
         self.track_list = match self.artist_album_list.album() {
@@ -83,12 +83,7 @@ impl LibraryPanel {
         Ok(())
     }
 
-    pub fn draw(
-        &mut self,
-        ui: &Ui,
-        frame: &mut ratatui::Frame<DeimosBackend>,
-        area: Rect,
-    ) -> anyhow::Result<()> {
+    pub fn draw(&mut self, ui: &Ui, frame: &mut ratatui::Frame, area: Rect) -> anyhow::Result<()> {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
