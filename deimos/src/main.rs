@@ -4,7 +4,10 @@ mod library;
 mod library_panel;
 mod ui;
 
-use std::{io, panic, path::PathBuf};
+use std::{
+    fs::{self, File},
+    io, panic,
+};
 
 use anyhow::Result;
 use app::App;
@@ -13,18 +16,38 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-
+use directories::{ProjectDirs, UserDirs};
 use library::Library;
+use log::debug;
 use ratatui::{backend::CrosstermBackend, Terminal};
 
 use tokio_stream::StreamExt;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let library_path = PathBuf::from("library.json");
-    let library = Library::load(&library_path).or_else(|_| {
-        let library = Library::scan(PathBuf::from("/home/vector/music"))?;
-        library.save(&library_path)?;
+    let project_dirs = ProjectDirs::from("ai", "ext0l", "deimos").unwrap();
+
+    // set up logging
+    let log_target = project_dirs.data_local_dir().join("deimos.log");
+    fs::create_dir_all(log_target.parent().unwrap())?;
+    env_logger::builder()
+        .target(env_logger::Target::Pipe(Box::new(File::create(
+            log_target,
+        )?)))
+        .init();
+
+    // load library
+    let cache_path = project_dirs.cache_dir().join("library.json");
+    let library = Library::load(&cache_path).or_else(|_| {
+        let library_path = UserDirs::new().unwrap().home_dir().join("music");
+        debug!(
+            "Library not found at {}, rescanning {}",
+            cache_path.display(),
+            library_path.display()
+        );
+        let library = Library::scan(&library_path)?;
+        fs::create_dir_all(cache_path.parent().unwrap())?;
+        library.save(&cache_path)?;
         anyhow::Ok(library)
     })?;
 
