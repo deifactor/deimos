@@ -156,6 +156,10 @@ pub enum Command {
     SearchBackspace,
     /// Seeks the current song by the given amount.
     Seek(i64),
+    /// Adds the currently selected song to the play queue.
+    AddSongToQueue,
+    PreviousTrack,
+    NextTrack,
     Quit,
 }
 
@@ -165,6 +169,7 @@ impl App {
             (Panel::Library, KeyCode::Char('/')) => Command::StartSearch,
             (Panel::Library, KeyCode::Char('q')) => Command::Quit,
             (Panel::Library, KeyCode::Tab) => Command::NextFocus,
+            (Panel::Library, KeyCode::Char('u')) => Command::AddSongToQueue,
             (Panel::Search, KeyCode::Char(c)) => Command::SearchInput(c),
             (Panel::Search, KeyCode::Backspace) => Command::SearchBackspace,
             (_, KeyCode::Up) => Command::MoveCursor(Motion::Up),
@@ -172,6 +177,8 @@ impl App {
             (_, KeyCode::Enter) => Command::Activate,
             (_, KeyCode::Char(',')) => Command::Seek(-5),
             (_, KeyCode::Char('.')) => Command::Seek(5),
+            (_, KeyCode::Char('z')) => Command::PreviousTrack,
+            (_, KeyCode::Char('c')) => Command::NextTrack,
             _ => return None,
         };
         Some(message)
@@ -243,6 +250,18 @@ impl App {
                 };
                 self.player.seek(target)?;
             }
+            AddSongToQueue => {
+                let Some(selected) = self.library_panel.track_list.selected() else {
+                    return Ok(());
+                };
+                self.player.queue_push(selected);
+            }
+            PreviousTrack => {
+                self.player.previous()?;
+            }
+            NextTrack => {
+                self.player.next()?;
+            }
         }
         Ok(())
     }
@@ -257,7 +276,8 @@ impl App {
                     let Some(selected) = self.library_panel.track_list.selected() else {
                         return Ok(());
                     };
-                    self.player.play_track(selected)?;
+                    self.player.set_play_queue(vec![selected]);
+                    self.player.play()?;
                 }
             },
             Panel::Search => {

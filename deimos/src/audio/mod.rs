@@ -23,6 +23,8 @@ pub struct Player {
     /// Provides an iterator over indiviudal samples as well as access to the underlying reader.
     source: Arc<Mutex<Option<Source>>>,
     tx_message: UnboundedSender<Message>,
+
+    queue: PlayQueue,
     /// Streams audio to the underlying OS audio library. We set this up on construction and never
     /// change it; instead, we just modify what `source` points to.
     _stream: Stream,
@@ -34,6 +36,12 @@ pub enum PlayerMessage {
         timestamp: Duration,
         track: Arc<Track>,
     },
+}
+
+#[derive(Debug, Default)]
+struct PlayQueue {
+    index: Option<usize>,
+    tracks: Vec<Arc<Track>>,
 }
 
 impl Player {
@@ -62,11 +70,30 @@ impl Player {
         Ok(Self {
             source,
             tx_message,
+            queue: PlayQueue::default(),
             _stream: stream,
         })
     }
 
-    pub fn play_track(&mut self, track: Arc<Track>) -> Result<()> {
+    /// Sets the play queue to the given playlist. Also stops existing playback.
+    pub fn set_play_queue(&mut self, tracks: Vec<Arc<Track>>) {
+        self.stop();
+        self.queue = PlayQueue::new(tracks);
+    }
+
+    pub fn queue_push(&mut self, track: Arc<Track>) {
+        self.queue.tracks.push(track);
+    }
+
+    /// Starts playing the play queue from the given track. Panics if the index is out of bounds.
+    /// Calling this with `None` is equivalent to `self.stop()`.
+    pub fn play_queue_track(&mut self, index: Option<usize>) -> Result<()> {
+        self.queue.index = index;
+        let Some(track) = self.queue.current() else {
+            self.stop();
+            return Ok(());
+        };
+
         let reader = Arc::new(Mutex::new(SymphoniaReader::from_path(&track.path)?));
         let tx_message = self.tx_message.clone();
         let on_decode: DecodeCallback = Box::new(move |fragment| {
@@ -81,6 +108,35 @@ impl Player {
         *self.source.lock().unwrap() = Some(source);
         Ok(())
     }
+}
+
+/// Functions related to playback control.
+impl Player {
+    pub fn previous(&mut self) -> Result<()> {
+        self.play_queue_track(self.queue.index.and_then(|i| i.checked_sub(1)))
+    }
+
+    pub fn play(&mut self) -> Result<()> {
+        if self.queue.current().is_none() && !self.queue.tracks.is_empty() {
+            self.play_queue_track(Some(0))?;
+        }
+        Ok(())
+    }
+
+    /// Moves to the next track. If this was the last track, equivalent to stop().
+    pub fn next(&mut self) -> Result<()> {
+        self.play_queue_track(
+            self.queue
+                .index
+                .map(|i| i + 1)
+                .filter(|i| *i < self.queue.tracks.len()),
+        )
+    }
+    /// Stops playback. This also unsets our position in the play queue.
+    pub fn stop(&mut self) {
+        self.queue.index = None;
+        *self.source.lock().unwrap() = None;
+    }
 
     /// Seek to the given timestamp. Does nothing if there's no currently-playing track.
     pub fn seek(&mut self, target: Duration) -> Result<()> {
@@ -90,6 +146,19 @@ impl Player {
         } else {
             Ok(())
         }
+    }
+}
+
+impl PlayQueue {
+    pub fn new(tracks: Vec<Arc<Track>>) -> Self {
+        Self {
+            index: None,
+            tracks,
+        }
+    }
+
+    pub fn current(&self) -> Option<Arc<Track>> {
+        self.index.map(|i| Arc::clone(&self.tracks[i]))
     }
 }
 
