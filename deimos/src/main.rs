@@ -24,7 +24,7 @@ async fn main() -> Result<()> {
     let library_path = PathBuf::from("library.json");
     let library = Library::load(&library_path).or_else(|_| {
         let library = Library::scan(PathBuf::from("/home/vector/music"))?;
-        let _ = library.save(&library_path)?;
+        library.save(&library_path)?;
         anyhow::Ok(library)
     })?;
 

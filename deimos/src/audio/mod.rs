@@ -56,11 +56,11 @@ impl Player {
         let stream = device.build_output_stream(
             &config,
             move |data: &mut [f32], _| {
-                source_clone.lock().unwrap().as_mut().map(|iter| {
-                    for (dst, src) in data.iter_mut().zip(iter.by_ref()) {
+                if let Some(iter) = source_clone.lock().unwrap().as_mut() {
+                    for (dst, src) in data.iter_mut().zip(iter) {
                         *dst = src
                     }
-                });
+                }
             },
             |e| {
                 dbg!(e);

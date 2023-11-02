@@ -3,7 +3,11 @@ use crate::parse::Node;
 use crate::style::Style;
 use maplit::hashset;
 use std::collections::HashSet;
-use std::{error, fmt, iter};
+use std::{
+    error,
+    fmt::{self, Write},
+    iter,
+};
 
 /// A `Formatter` takes a bunch of key/value pairs and interpolates them into a
 /// mimi format string.
@@ -59,8 +63,10 @@ impl Formatter {
     /// Formats the given values using ANSI terminal codes.
     pub fn ansi<'a, M: std::ops::Index<&'a str, Output = String>>(&'a self, values: &M) -> String {
         self.spans(values)
-            .map(|(text, style)| format!("{}{}{}", style.ansi(), text, termion::style::Reset))
-            .collect()
+            .fold(String::new(), |mut output, (text, style)| {
+                let _ = write!(output, "{}{}{}", style.ansi(), text, termion::style::Reset);
+                output
+            })
     }
 
     /// Yields the text of each leaf node under `root` with variables
