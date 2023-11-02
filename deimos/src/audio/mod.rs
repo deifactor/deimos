@@ -9,6 +9,7 @@ use cpal::{
     traits::{DeviceTrait, HostTrait},
     Sample, Stream,
 };
+use educe::Educe;
 use itertools::Itertools;
 use log::error;
 use symphonia::core::audio::{AudioBuffer, SampleBuffer};
@@ -34,8 +35,11 @@ pub struct Player {
     _stream: Stream,
 }
 
+#[derive(Educe)]
+#[educe(Debug)]
 pub enum PlayerMessage {
     AudioFragment {
+        #[educe(Debug(ignore))]
         buffer: AudioBuffer<f32>,
         timestamp: Duration,
     },

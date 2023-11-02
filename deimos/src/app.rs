@@ -3,6 +3,7 @@ use std::{io::Stdout, time::Duration};
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use enum_iterator::next_cycle;
+use log::debug;
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
@@ -79,6 +80,7 @@ impl App {
                 AppEvent::Message(message) => Some(message),
             };
             if let Some(message) = message {
+                debug!("Received message {message:?}");
                 self.dispatch(message)?;
             }
             terminal.draw(|f| self.draw(f).expect("failed to rerender app"))?;
@@ -133,6 +135,7 @@ pub enum Motion {
 
 /// An [`message`] corresponds to a mutation of the application state. All mutation of application
 /// state should be done through messages.
+#[derive(Debug)]
 pub enum Message {
     Command(Command),
     Player(PlayerMessage),
@@ -140,6 +143,7 @@ pub enum Message {
 
 /// A [`Command`] corresponds to a single user input. The translation of keys to commands is done
 /// by a match statement on (active panel, keycode).
+#[derive(Debug)]
 pub enum Command {
     /// Start a new search query.
     StartSearch,
