@@ -25,6 +25,9 @@ pub struct Player {
     source: Arc<Mutex<Option<Source>>>,
     tx_message: UnboundedSender<Message>,
 
+    // note: not set by the [`Player`] itself, but by the [`App`] on receiving a [`PlayerMessage`]
+    timestamp: Option<Duration>,
+
     queue: PlayQueue,
     /// Streams audio to the underlying OS audio library. We set this up on construction and never
     /// change it; instead, we just modify what `source` points to.
@@ -35,7 +38,6 @@ pub enum PlayerMessage {
     AudioFragment {
         buffer: AudioBuffer<f32>,
         timestamp: Duration,
-        track: Arc<Track>,
     },
 }
 
@@ -78,9 +80,23 @@ impl Player {
         Ok(Self {
             source,
             tx_message,
+            timestamp: None,
             queue: PlayQueue::default(),
             _stream: stream,
         })
+    }
+
+    /// The currently-playing track.
+    pub fn current(&self) -> Option<Arc<Track>> {
+        self.queue.current()
+    }
+
+    pub fn timestamp(&self) -> Option<Duration> {
+        self.timestamp
+    }
+
+    pub fn set_timestamp(&mut self, timestamp: Option<Duration>) {
+        self.timestamp = timestamp;
     }
 
     /// Sets the play queue to the given playlist. Also stops existing playback.
@@ -108,7 +124,6 @@ impl Player {
             let _ = tx_message.send(Message::Player(PlayerMessage::AudioFragment {
                 buffer: fragment.buffer,
                 timestamp: fragment.timestamp,
-                track: Arc::clone(&track),
             }));
         });
         let on_finish: FinishCallback = Box::new(|| ());

@@ -20,11 +20,8 @@ use crate::{
     library::Library,
     library_panel::{LibraryPanel, PanelItem},
     ui::{
-        artist_album_list::ArtistAlbumList,
-        now_playing::{NowPlaying, PlayState},
-        search::Search,
-        spectrogram::Visualizer,
-        Ui,
+        artist_album_list::ArtistAlbumList, now_playing::NowPlaying, search::Search,
+        spectrogram::Visualizer, Ui,
     },
 };
 
@@ -39,7 +36,6 @@ pub struct App {
     library: Library,
     player: Player,
     library_panel: LibraryPanel,
-    now_playing: NowPlaying,
     visualizer: Visualizer,
     search: Search,
     active_panel: Panel,
@@ -56,7 +52,6 @@ impl App {
             library,
             player: Player::new(_tx_message).unwrap(),
             library_panel: LibraryPanel::default(),
-            now_playing: NowPlaying::default(),
             visualizer: Visualizer::default(),
             search: Search::default(),
             active_panel: Panel::Library,
@@ -108,7 +103,11 @@ impl App {
             .direction(Direction::Horizontal)
             .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
             .split(root[1]);
-        self.now_playing.draw(&self.ui, f, bottom[0])?;
+        NowPlaying {
+            timestamp: self.player.timestamp(),
+            track: self.player.current(),
+        }
+        .draw(&self.ui, f, bottom[0])?;
         self.visualizer.draw(&self.ui, f, bottom[1])?;
         Ok(())
     }
@@ -191,12 +190,8 @@ impl App {
                 self.dispatch_command(command)?;
             }
 
-            Player(PlayerMessage::AudioFragment {
-                buffer,
-                timestamp,
-                track,
-            }) => {
-                self.now_playing.play_state = Some(PlayState { timestamp, track });
+            Player(PlayerMessage::AudioFragment { buffer, timestamp }) => {
+                self.player.set_timestamp(Some(timestamp));
                 self.visualizer.update_spectrum(buffer)?;
             }
         }
@@ -240,7 +235,7 @@ impl App {
                 self.library_panel.focus = next_cycle(&self.library_panel.focus).unwrap();
             }
             Seek(seconds) => {
-                let Some(now) = self.now_playing.play_state.as_ref().map(|s| s.timestamp) else {
+                let Some(now) = self.player.timestamp() else {
                     return Ok(());
                 };
                 let target = if seconds > 0 {
