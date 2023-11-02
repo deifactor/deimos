@@ -7,9 +7,10 @@ use std::{
 use anyhow::{Context, Result};
 use cpal::{
     traits::{DeviceTrait, HostTrait},
-    Stream,
+    Sample, Stream,
 };
 use itertools::Itertools;
+use log::error;
 use symphonia::core::audio::{AudioBuffer, SampleBuffer};
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -57,13 +58,20 @@ impl Player {
             &config,
             move |data: &mut [f32], _| {
                 if let Some(iter) = source_clone.lock().unwrap().as_mut() {
-                    for (dst, src) in data.iter_mut().zip(iter) {
+                    // copy from src to dst, zeroing the rest
+                    for (dst, src) in data
+                        .iter_mut()
+                        .zip(iter.chain(iter::repeat(f32::EQUILIBRIUM)))
+                    {
                         *dst = src
                     }
+                } else {
+                    // no data, so just zero the entire thing
+                    data.fill(f32::EQUILIBRIUM);
                 }
             },
             |e| {
-                dbg!(e);
+                error!("Error while streaming audio out: {e}");
             },
             None,
         )?;
