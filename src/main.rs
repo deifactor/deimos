@@ -23,7 +23,7 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 
 use tokio_stream::StreamExt;
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     let project_dirs = ProjectDirs::from("ai", "ext0l", "deimos").unwrap();
 
