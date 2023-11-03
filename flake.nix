@@ -20,6 +20,7 @@
           nativeBuildInputs = with pkgs; [
             toolchain
             cargo-nextest
+            cargo-outdated
 
             pkg-config
             alsa-lib
