@@ -163,7 +163,8 @@ pub enum Command {
     Seek(i64),
     /// Adds the currently selected song to the play queue.
     AddSongToQueue,
-    PreviousTrack,
+    /// Seeks to the previous song if near the beginning, or restarts the song if not.
+    PreviousOrSeekToStart,
     PlayPause,
     NextTrack,
     Quit,
@@ -183,7 +184,7 @@ impl App {
             (_, KeyCode::Enter) => Command::Activate,
             (_, KeyCode::Char(',')) => Command::Seek(-5),
             (_, KeyCode::Char('.')) => Command::Seek(5),
-            (_, KeyCode::Char('z')) => Command::PreviousTrack,
+            (_, KeyCode::Char('z')) => Command::PreviousOrSeekToStart,
             (_, KeyCode::Char('x')) => Command::PlayPause,
             (_, KeyCode::Char('c')) => Command::NextTrack,
             _ => return None,
@@ -266,8 +267,17 @@ impl App {
                     self.player.play()?;
                 }
             }
-            PreviousTrack => {
-                self.player.previous()?;
+            PreviousOrSeekToStart => {
+                const MIN_DURATION_TO_SEEK: Duration = Duration::from_secs(5);
+                if self
+                    .player
+                    .timestamp()
+                    .map_or(false, |dur| dur >= MIN_DURATION_TO_SEEK)
+                {
+                    self.player.seek(Duration::ZERO)?;
+                } else {
+                    self.player.previous()?;
+                }
             }
             NextTrack => {
                 self.player.next()?;
