@@ -74,6 +74,8 @@ impl App {
 
         let mut event_stream = AppEvent::stream(terminal_events, self.rx_message.take().unwrap());
 
+        // draw once before we get an event
+        terminal.draw(|f| self.draw(f).expect("failed to rerender app"))?;
         while let Some(event) = event_stream.next().await {
             let message = match event {
                 AppEvent::Terminal(terminal_event) => self.lookup_binding(terminal_event),
