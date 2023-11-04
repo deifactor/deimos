@@ -3,6 +3,7 @@ use std::{io::Stdout, time::Duration};
 use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use enum_iterator::next_cycle;
+use itertools::Itertools;
 use log::debug;
 use ratatui::{
     backend::CrosstermBackend,
@@ -296,7 +297,10 @@ impl App {
                     let Some(selected) = self.library_panel.track_list.selected() else {
                         return Ok(());
                     };
-                    self.player.set_play_queue(vec![selected]);
+                    let tracks = self.library_panel.track_list.tracks().collect_vec();
+                    let index = tracks.iter().find_position(|t| **t == selected).unwrap().0;
+                    self.player.set_play_queue(tracks);
+                    self.player.set_queue_index(Some(index))?;
                     self.player.play()?;
                 }
             },

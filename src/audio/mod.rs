@@ -122,9 +122,8 @@ impl Player {
         self.queue.tracks.push(track);
     }
 
-    /// Starts playing the play queue from the given track. Panics if the index is out of bounds.
-    /// Calling this with `None` is equivalent to `self.stop()`.
-    pub fn play_queue_track(&mut self, index: Option<usize>) -> Result<()> {
+    /// Sets the current track to the one at the given position. Panics if that's out of bounds.
+    pub fn set_queue_index(&mut self, index: Option<usize>) -> Result<()> {
         self.queue.index = index;
         let Some(track) = self.queue.current() else {
             self.stop();
@@ -149,13 +148,13 @@ impl Player {
 /// Functions related to playback control.
 impl Player {
     pub fn previous(&mut self) -> Result<()> {
-        self.play_queue_track(self.queue.index.and_then(|i| i.checked_sub(1)))
+        self.set_queue_index(self.queue.index.and_then(|i| i.checked_sub(1)))
     }
 
     /// Unpauses. If there is no selected track, selects the first track.
     pub fn play(&mut self) -> Result<()> {
         if self.queue.current().is_none() && !self.queue.tracks.is_empty() {
-            self.play_queue_track(Some(0))?;
+            self.set_queue_index(Some(0))?;
         }
         self.set_paused(false);
         Ok(())
@@ -176,7 +175,7 @@ impl Player {
 
     /// Moves to the next track. If this was the last track, equivalent to stop().
     pub fn next(&mut self) -> Result<()> {
-        self.play_queue_track(
+        self.set_queue_index(
             self.queue
                 .index
                 .map(|i| i + 1)

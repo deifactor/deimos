@@ -100,6 +100,14 @@ impl TrackList {
         })
     }
 
+    /// Iterates over the actual tracks currently being displayed, in order.
+    pub fn tracks(&self) -> impl Iterator<Item = Arc<Track>> + '_ {
+        self.items.iter().filter_map(|item| match item {
+            TrackListItem::Track(track) => Some(Arc::clone(track)),
+            _ => None,
+        })
+    }
+
     pub fn draw(
         &mut self,
         state: ActiveState,
