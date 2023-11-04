@@ -164,6 +164,7 @@ pub enum Command {
     /// Adds the currently selected song to the play queue.
     AddSongToQueue,
     PreviousTrack,
+    PlayPause,
     NextTrack,
     Quit,
 }
@@ -183,6 +184,7 @@ impl App {
             (_, KeyCode::Char(',')) => Command::Seek(-5),
             (_, KeyCode::Char('.')) => Command::Seek(5),
             (_, KeyCode::Char('z')) => Command::PreviousTrack,
+            (_, KeyCode::Char('x')) => Command::PlayPause,
             (_, KeyCode::Char('c')) => Command::NextTrack,
             _ => return None,
         };
@@ -256,6 +258,13 @@ impl App {
                     return Ok(());
                 };
                 self.player.queue_push(selected);
+            }
+            PlayPause => {
+                if self.player.playing() {
+                    self.player.set_paused(true)
+                } else {
+                    self.player.play()?;
+                }
             }
             PreviousTrack => {
                 self.player.previous()?;

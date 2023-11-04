@@ -1,6 +1,6 @@
 use std::{
     iter,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, RwLock},
     time::Duration,
 };
 
@@ -25,6 +25,10 @@ pub struct Player {
     /// Provides an iterator over indiviudal samples as well as access to the underlying reader.
     source: Arc<Mutex<Option<Source>>>,
     tx_message: UnboundedSender<Message>,
+
+    /// If true, playback is paused. If there are no songs in the queue, the value of this is not
+    /// specified.
+    paused: Arc<RwLock<bool>>,
 
     // note: not set by the [`Player`] itself, but by the [`App`] on receiving a [`PlayerMessage`]
     timestamp: Option<Duration>,
@@ -58,22 +62,26 @@ impl Player {
             .default_output_device()
             .context("no default output device")?;
         let source: Arc<Mutex<Option<Source>>> = Arc::new(Mutex::new(None));
-        let config = device.default_output_config()?.config();
         let source_clone = Arc::clone(&source);
+        let paused = Arc::new(RwLock::new(true));
+        let paused_clone = Arc::clone(&paused);
+
+        let config = device.default_output_config()?.config();
         let stream = device.build_output_stream(
             &config,
             move |data: &mut [f32], _| {
-                if let Some(iter) = source_clone.lock().unwrap().as_mut() {
-                    // copy from src to dst, zeroing the rest
-                    for (dst, src) in data
-                        .iter_mut()
-                        .zip(iter.chain(iter::repeat(f32::EQUILIBRIUM)))
-                    {
-                        *dst = src
+                match source_clone.lock().unwrap().as_mut() {
+                    Some(iter) if !*paused_clone.read().unwrap() => {
+                        // copy from src to dst, zeroing the rest
+                        for (dst, src) in data
+                            .iter_mut()
+                            .zip(iter.chain(iter::repeat(f32::EQUILIBRIUM)))
+                        {
+                            *dst = src
+                        }
                     }
-                } else {
                     // no data, so just zero the entire thing
-                    data.fill(f32::EQUILIBRIUM);
+                    _ => data.fill(f32::EQUILIBRIUM),
                 }
             },
             |e| {
@@ -84,6 +92,7 @@ impl Player {
         Ok(Self {
             source,
             tx_message,
+            paused,
             timestamp: None,
             queue: PlayQueue::default(),
             _stream: stream,
@@ -143,11 +152,26 @@ impl Player {
         self.play_queue_track(self.queue.index.and_then(|i| i.checked_sub(1)))
     }
 
+    /// Unpauses. If there is no selected track, selects the first track.
     pub fn play(&mut self) -> Result<()> {
         if self.queue.current().is_none() && !self.queue.tracks.is_empty() {
             self.play_queue_track(Some(0))?;
         }
+        self.set_paused(false);
         Ok(())
+    }
+
+    /// True if audio is being produced (i.e., we're not paused *and* there's a current song).
+    pub fn playing(&self) -> bool {
+        !self.paused() && self.current().is_some()
+    }
+
+    pub fn paused(&self) -> bool {
+        *self.paused.write().unwrap()
+    }
+
+    pub fn set_paused(&mut self, paused: bool) {
+        *self.paused.write().unwrap() = paused;
     }
 
     /// Moves to the next track. If this was the last track, equivalent to stop().
