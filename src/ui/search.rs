@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{cell::RefCell, sync::Arc};
 
 use anyhow::Result;
 use itertools::Itertools;
@@ -52,7 +52,7 @@ impl SearchResult {
 pub struct Search {
     query: String,
     results: Vec<SearchResult>,
-    state: ListState,
+    state: RefCell<ListState>,
 }
 
 impl Search {
@@ -108,7 +108,7 @@ impl Search {
         Ok(())
     }
 
-    pub fn draw(&mut self, ui: &super::Ui, frame: &mut Frame, area: Rect) -> Result<()> {
+    pub fn draw(&self, ui: &super::Ui, frame: &mut Frame, area: Rect) -> Result<()> {
         let block = Block::default()
             .title("Search")
             .borders(Borders::ALL)
@@ -130,7 +130,7 @@ impl Search {
         )
         .highlight_style(Style::default().fg(Color::Cyan).bg(Color::Rgb(30, 30, 30)))
         .block(block);
-        frame.render_stateful_widget(results, root[1], &mut self.state);
+        frame.render_stateful_widget(results, root[1], &mut self.state.borrow_mut());
         Ok(())
     }
 }

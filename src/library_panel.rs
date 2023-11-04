@@ -83,7 +83,7 @@ impl LibraryPanel {
         Ok(())
     }
 
-    pub fn draw(&mut self, ui: &Ui, frame: &mut ratatui::Frame, area: Rect) -> anyhow::Result<()> {
+    pub fn draw(&self, ui: &Ui, frame: &mut ratatui::Frame, area: Rect) -> anyhow::Result<()> {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])

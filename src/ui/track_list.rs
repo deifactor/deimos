@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{cell::RefCell, sync::Arc};
 
 use anyhow::Result;
 use itertools::Itertools;
@@ -42,7 +42,7 @@ impl TrackListItem {
 #[derive(Debug, Default)]
 pub struct TrackList {
     items: Vec<TrackListItem>,
-    state: ListState,
+    state: RefCell<ListState>,
 }
 
 /// Methods for manipulating the state
@@ -50,7 +50,7 @@ impl TrackList {
     pub fn new(items: Vec<TrackListItem>) -> Self {
         Self {
             items,
-            state: ListState::default(),
+            state: RefCell::new(ListState::default()),
         }
     }
 
@@ -61,7 +61,7 @@ impl TrackList {
         if self.items.is_empty() {
             return;
         }
-        let candidate = match self.state.selected() {
+        let candidate = match self.state.borrow().selected() {
             Some(selected) => Some(
                 selected
                     .saturating_add_signed(amount)
@@ -70,8 +70,8 @@ impl TrackList {
             None if amount > 0 => Some(0),
             None => None,
         };
-        self.state
-            .select(candidate.and_then(|start| self.next_valid_selection(start, amount)));
+        let index = candidate.and_then(|start| self.next_valid_selection(start, amount));
+        self.state.get_mut().select(index);
     }
 
     /// If `i` is selectable, returns it. If not, moves in the direction given by the signum of
@@ -87,6 +87,7 @@ impl TrackList {
 
     pub fn select(&mut self, title: &str) {
         self.state
+            .get_mut()
             .select(self.items.iter().position(|track| match track {
                 TrackListItem::Track(track) => track.title.as_deref() == Some(title),
                 _ => false,
@@ -94,10 +95,13 @@ impl TrackList {
     }
 
     pub fn selected(&self) -> Option<Arc<Track>> {
-        self.state.selected().map(|i| match &self.items[i] {
-            TrackListItem::Track(track) => track.clone(),
-            _ => panic!("Somehow selected a non-track"),
-        })
+        self.state
+            .borrow()
+            .selected()
+            .map(|i| match &self.items[i] {
+                TrackListItem::Track(track) => track.clone(),
+                _ => panic!("Somehow selected a non-track"),
+            })
     }
 
     /// Iterates over the actual tracks currently being displayed, in order.
@@ -108,13 +112,7 @@ impl TrackList {
         })
     }
 
-    pub fn draw(
-        &mut self,
-        state: ActiveState,
-        ui: &Ui,
-        frame: &mut Frame,
-        area: Rect,
-    ) -> Result<()> {
+    pub fn draw(&self, state: ActiveState, ui: &Ui, frame: &mut Frame, area: Rect) -> Result<()> {
         let block = Block::default()
             .title("Tracks")
             .borders(Borders::ALL)
@@ -128,7 +126,7 @@ impl TrackList {
         )
         .highlight_style(Style::default().fg(Color::Cyan).bg(Color::Rgb(30, 30, 30)))
         .block(block);
-        frame.render_stateful_widget(list, area, &mut self.state);
+        frame.render_stateful_widget(list, area, &mut self.state.borrow_mut());
         Ok(())
     }
 }

@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{cell::Cell, collections::HashSet};
 
 use anyhow::{anyhow, Result};
 use itertools::Itertools;
@@ -39,7 +39,7 @@ pub struct ArtistAlbumList {
     highlight_style: Style,
 
     /// Number of lines to scroll down when rendering.
-    offset: usize,
+    offset: Cell<usize>,
     /// The offset of the selected item, if any.
     selected: Option<usize>,
     /// Whether or not the artist is expanded.
@@ -173,13 +173,7 @@ impl ArtistAlbumList {
         }
     }
 
-    pub fn draw(
-        &mut self,
-        state: ActiveState,
-        ui: &Ui,
-        frame: &mut Frame,
-        area: Rect,
-    ) -> Result<()> {
+    pub fn draw(&self, state: ActiveState, ui: &Ui, frame: &mut Frame, area: Rect) -> Result<()> {
         let block = Block::default()
             .title("Artist / Album")
             .borders(Borders::ALL)
@@ -194,16 +188,18 @@ impl ArtistAlbumList {
         }
 
         if let Some(selected) = self.selected {
-            self.offset = self
-                .offset
-                .max(selected.saturating_sub(inner.height.saturating_sub(3) as usize));
+            self.offset.set(
+                self.offset
+                    .get()
+                    .max(selected.saturating_sub(inner.height.saturating_sub(3) as usize)),
+            );
         }
 
         for (index, row) in self
             .rows
             .iter()
             .enumerate()
-            .skip(self.offset)
+            .skip(self.offset.get())
             .take(inner.height.into())
         {
             let style = if self.selected == Some(index) {
@@ -211,7 +207,7 @@ impl ArtistAlbumList {
             } else {
                 Style::default()
             };
-            let y = index - self.offset;
+            let y = index - self.offset.get();
             let mut text = self.text(*row);
             // need to manually truncate; setting the wrap to `trim: true` will also trim leading whitespace
             text.truncate(inner.width as usize);
