@@ -16,6 +16,7 @@ pub struct Theme {
     pub focused_border: Style,
     pub unfocused_border: Style,
     pub section_header: Style,
+    pub now_playing_track: Style,
 }
 
 impl Default for Theme {
@@ -26,6 +27,7 @@ impl Default for Theme {
             section_header: Style::default()
                 .bg(Color::Rgb(0, 0, 60))
                 .add_modifier(Modifier::BOLD | Modifier::ITALIC),
+            now_playing_track: Style::default().fg(Color::LightCyan),
         }
     }
 }

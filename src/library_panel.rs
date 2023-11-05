@@ -1,10 +1,12 @@
+use std::sync::Arc;
+
 use anyhow::Result;
 use enum_iterator::Sequence;
 use itertools::Itertools;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 use crate::{
-    library::Library,
+    library::{Library, Track},
     ui::{
         artist_album_list::ArtistAlbumList,
         search::SearchResult,
@@ -83,7 +85,13 @@ impl LibraryPanel {
         Ok(())
     }
 
-    pub fn draw(&self, ui: &Ui, frame: &mut ratatui::Frame, area: Rect) -> anyhow::Result<()> {
+    pub fn draw(
+        &self,
+        ui: &Ui,
+        frame: &mut ratatui::Frame,
+        area: Rect,
+        current_track: Option<Arc<Track>>,
+    ) -> anyhow::Result<()> {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
@@ -99,6 +107,7 @@ impl LibraryPanel {
             ui,
             frame,
             layout[1],
+            current_track,
         )?;
         Ok(())
     }

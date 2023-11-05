@@ -101,7 +101,10 @@ impl App {
             .constraints([Constraint::Min(10), Constraint::Max(6)])
             .split(f.size());
         match self.active_panel {
-            Panel::Library => self.library_panel.draw(&self.ui, f, root[0])?,
+            Panel::Library => {
+                self.library_panel
+                    .draw(&self.ui, f, root[0], self.player.current())?
+            }
             Panel::Search => self.search.draw(&self.ui, f, root[0])?,
         }
         let bottom = Layout::default()

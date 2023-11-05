@@ -23,10 +23,15 @@ pub enum TrackListItem {
 }
 
 impl TrackListItem {
-    fn as_list_item(&self, ui: &Ui) -> ListItem {
+    fn as_list_item(&self, ui: &Ui, current_track: Option<Arc<Track>>) -> ListItem {
         match self {
             TrackListItem::Track(track) => {
-                ListItem::new(track.title.as_deref().unwrap_or("<unknown>"))
+                let list_item = ListItem::new(track.title.as_deref().unwrap_or("<unknown>"));
+                if current_track.as_ref() == Some(track) {
+                    list_item.style(ui.theme.now_playing_track)
+                } else {
+                    list_item
+                }
             }
             TrackListItem::Section(title) => {
                 ListItem::new(title.clone()).style(ui.theme.section_header)
@@ -112,7 +117,14 @@ impl TrackList {
         })
     }
 
-    pub fn draw(&self, state: ActiveState, ui: &Ui, frame: &mut Frame, area: Rect) -> Result<()> {
+    pub fn draw(
+        &self,
+        state: ActiveState,
+        ui: &Ui,
+        frame: &mut Frame,
+        area: Rect,
+        current_track: Option<Arc<Track>>,
+    ) -> Result<()> {
         let block = Block::default()
             .title("Tracks")
             .borders(Borders::ALL)
@@ -121,7 +133,7 @@ impl TrackList {
         let list = List::new(
             self.items
                 .iter()
-                .map(|item| item.as_list_item(ui))
+                .map(|item| item.as_list_item(ui, current_track.clone()))
                 .collect_vec(),
         )
         .highlight_style(Style::default().fg(Color::Cyan).bg(Color::Rgb(30, 30, 30)))
