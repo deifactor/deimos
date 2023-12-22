@@ -257,6 +257,7 @@ impl App {
                     now - Duration::from_secs(seconds.unsigned_abs())
                 };
                 self.player.seek(target)?;
+                self.visualizer.reset()?;
             }
             AddSongToQueue => {
                 let Some(selected) = self.library_panel.track_list.selected() else {
@@ -282,9 +283,11 @@ impl App {
                 } else {
                     self.player.previous()?;
                 }
+                self.visualizer.reset()?;
             }
             NextTrack => {
                 self.player.next()?;
+                self.visualizer.reset()?;
             }
         }
         Ok(())
@@ -305,6 +308,7 @@ impl App {
                     self.player.set_play_queue(tracks);
                     self.player.set_queue_index(Some(index))?;
                     self.player.play()?;
+                    self.visualizer.reset()?;
                 }
             },
             Panel::Search => {

@@ -1,4 +1,4 @@
-use eyre::{anyhow, Result};
+use eyre::{anyhow, eyre, Result};
 use itertools::Itertools;
 use ratatui::widgets::Sparkline;
 use spectrum_analyzer::{
@@ -65,6 +65,20 @@ impl Visualizer {
             spectrum,
             amplitudes: None,
         })
+    }
+
+    /// Resets the visualizer's state as if freshly-created.
+    pub fn reset(&mut self) -> Result<()> {
+        self.buffer.fill(0.0);
+        self.spectrum = samples_fft_to_spectrum(
+            &hann_window(&self.buffer),
+            44100,
+            FrequencyLimit::All,
+            Some(&divide_by_N_sqrt),
+        )
+        .map_err(|e| eyre!("couldn't FFT: {:?}", e))?;
+        self.amplitudes = None;
+        Ok(())
     }
 
     /// Recompute `self.spectrum` from the given samples.
