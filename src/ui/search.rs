@@ -11,7 +11,8 @@ use nucleo_matcher::{
 use once_cell::sync::Lazy;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame,
 };
@@ -76,7 +77,6 @@ impl SearchItem {
 
 /// A slice of text used to display a search result.
 #[derive(Debug)]
-#[allow(dead_code)]
 struct SearchTextSegment {
     text: String,
     matched: bool,
@@ -86,7 +86,6 @@ struct SearchTextSegment {
 pub struct SearchResult {
     item: SearchItem,
     score: u32,
-    #[allow(dead_code)]
     segments: Vec<SearchTextSegment>,
 }
 
@@ -174,6 +173,29 @@ impl Search {
         Ok(())
     }
 
+    fn render_search_segment(&self, segments: &[SearchTextSegment]) -> ListItem<'static> {
+        let match_style = Style::default()
+            .fg(Color::Blue)
+            .add_modifier(Modifier::BOLD);
+        let spans = segments
+            .iter()
+            .map(|segment| {
+                Span::styled(
+                    segment.text.clone(),
+                    if segment.matched {
+                        match_style
+                    } else {
+                        Style::default()
+                    },
+                )
+            })
+            .collect_vec();
+        ListItem::new(Line {
+            spans,
+            alignment: None,
+        })
+    }
+
     pub fn draw(&self, ui: &super::Ui, frame: &mut Frame, area: Rect) -> Result<()> {
         let block = Block::default()
             .title("Search")
@@ -191,7 +213,7 @@ impl Search {
         let results = List::new(
             self.results
                 .iter()
-                .map(|result| ListItem::new(result.item.to_string()))
+                .map(|result| self.render_search_segment(&result.segments))
                 .collect_vec(),
         )
         .highlight_style(Style::default().fg(Color::Cyan).bg(Color::Rgb(30, 30, 30)))
