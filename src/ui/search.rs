@@ -1,13 +1,19 @@
-use std::{cell::RefCell, sync::Arc};
+use std::{cell::RefCell, cmp::Reverse, fmt::Display, ops::DerefMut, sync::Arc};
 
 use eyre::Result;
 use itertools::Itertools;
+use nucleo_matcher::{
+    pattern::{CaseMatching, Pattern},
+    Config, Matcher, Utf32Str,
+};
+use once_cell::sync::Lazy;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame,
 };
+use std::sync::Mutex;
 
 use crate::library::{AlbumName, ArtistName, Library, Track};
 
@@ -21,6 +27,24 @@ pub enum SearchResult {
     Artist(ArtistName),
     Album(AlbumName, ArtistName),
     Track(Arc<Track>),
+}
+
+static MATCHER: Lazy<Mutex<Matcher>> = Lazy::new(|| Mutex::new(Matcher::new(Config::DEFAULT)));
+
+impl Display for SearchResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SearchResult::Artist(artist) => write!(f, "{}", artist),
+            SearchResult::Album(album, artist) => write!(f, "{} - {}", artist, album),
+            SearchResult::Track(track) => write!(
+                f,
+                "{} - {} - {}",
+                track.title.as_deref().unwrap_or("<unknown>"),
+                track.artist,
+                track.album
+            ),
+        }
+    }
 }
 
 impl SearchResult {
@@ -46,6 +70,26 @@ impl SearchResult {
             _ => None,
         }
     }
+
+    /// Matches the given pattern against this. If success, returns (score, indices). Indices are
+    /// guaranteed to be sorted.
+    pub fn matches(&self, pattern: &Pattern) -> Option<(u32, Vec<u32>)> {
+        let mut buf = vec![];
+        let displayed = self.to_string();
+        let haystack = Utf32Str::new(&displayed, &mut buf);
+        let mut indices = vec![];
+        pattern
+            .indices(
+                haystack,
+                MATCHER.try_lock().unwrap().deref_mut(),
+                &mut indices,
+            )
+            .map(|s| {
+                indices.sort_unstable();
+                indices.dedup();
+                (s, indices)
+            })
+    }
 }
 
 #[derive(Debug, Default)]
@@ -67,46 +111,32 @@ impl Search {
             .map(|i| self.results[i].clone())
     }
 
-    fn render_result(&self, track: &SearchResult) -> ListItem<'static> {
-        match track {
-            SearchResult::Artist(artist) => ListItem::new(format!("{}", artist)),
-            SearchResult::Album(album, artist) => ListItem::new(format!("{} - {}", album, artist)),
-            SearchResult::Track(track) => ListItem::new(format!(
-                "{} - {} - {}",
-                track.title.as_deref().unwrap_or("<unknown>"),
-                track.album,
-                track.artist,
-            )),
-        }
-    }
-
     pub fn run_query(&mut self, library: &Library, query: impl AsRef<str>) -> Result<()> {
         let query = query.as_ref();
         self.query = query.to_owned();
 
-        // XXX: this isn't right. use regex
-        let is_match = |haystack: &String| haystack.to_lowercase().contains(&query.to_lowercase());
+        let pattern = Pattern::parse(query, CaseMatching::Ignore);
+
         let artists = library
             .artists()
-            .map(|a| &a.name)
-            .filter(|id| match id {
-                ArtistName::Unknown => false,
-                ArtistName::Artist(name) => is_match(name),
-            })
-            .cloned()
+            .map(|a| a.name.clone())
             .map(SearchResult::Artist);
 
         let albums = library
             .albums_with_artist()
-            .filter(|(album, _)| album.name.0.as_ref().map_or(false, is_match))
             .map(|(album, artist)| SearchResult::Album(album.name.clone(), artist.name.clone()));
 
-        let tracks = library
-            .tracks()
-            .filter(|track| track.title.as_ref().map_or(false, is_match))
-            .map(SearchResult::Track);
+        let tracks = library.tracks().map(SearchResult::Track);
 
-        self.results = artists.chain(albums).chain(tracks).collect_vec();
+        let mut scored = artists
+            .chain(albums)
+            .chain(tracks)
+            .filter_map(|result| result.matches(&pattern).map(|score| (result, score)))
+            .collect_vec();
+        scored.sort_by_key(|(_, (score, _))| Reverse(*score));
+        scored.reverse();
+
+        self.results = scored.into_iter().map(|(result, _)| result).collect_vec();
         *self.state.borrow_mut().selected_mut() = if self.results.is_empty() {
             None
         } else {
@@ -133,7 +163,7 @@ impl Search {
         let results = List::new(
             self.results
                 .iter()
-                .map(|track| self.render_result(track))
+                .map(|track| ListItem::new(track.to_string()))
                 .collect_vec(),
         )
         .highlight_style(Style::default().fg(Color::Cyan).bg(Color::Rgb(30, 30, 30)))
