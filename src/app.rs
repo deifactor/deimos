@@ -151,6 +151,8 @@ pub enum Message {
 /// by a match statement on (active panel, keycode).
 #[derive(Debug)]
 pub enum Command {
+    /// Cancel out of whatever it is we're doing.
+    Cancel,
     /// Start a new search query.
     StartSearch,
     /// Move focus to the next item in the panel.
@@ -191,6 +193,7 @@ impl App {
             (_, KeyCode::Char('z')) => Command::PreviousOrSeekToStart,
             (_, KeyCode::Char('x')) => Command::PlayPause,
             (_, KeyCode::Char('c')) => Command::NextTrack,
+            (_, KeyCode::Esc) => Command::Cancel,
             _ => return None,
         };
         Some(message)
@@ -214,6 +217,10 @@ impl App {
     fn dispatch_command(&mut self, command: Command) -> Result<()> {
         use Command::*;
         match command {
+            Cancel => match self.active_panel {
+                Panel::Library => (),
+                Panel::Search => self.active_panel = Panel::Library,
+            },
             StartSearch => {
                 self.active_panel = Panel::Search;
                 self.search = Search::default();
