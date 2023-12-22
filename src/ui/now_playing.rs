@@ -21,7 +21,7 @@ impl NowPlaying {
         _ui: &crate::ui::Ui,
         frame: &mut ratatui::Frame,
         area: ratatui::layout::Rect,
-    ) -> anyhow::Result<()> {
+    ) -> eyre::Result<()> {
         let (Some(timestamp), Some(track)) = (self.timestamp.as_ref(), self.track.as_ref()) else {
             return Ok(());
         };

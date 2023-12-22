@@ -1,6 +1,6 @@
 use std::{cell::Cell, collections::HashSet};
 
-use anyhow::{anyhow, Result};
+use eyre::{anyhow, Result};
 use itertools::Itertools;
 use ratatui::{
     layout::Rect,

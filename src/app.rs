@@ -1,8 +1,8 @@
 use std::{io::Stdout, time::Duration};
 
-use anyhow::Result;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use enum_iterator::next_cycle;
+use eyre::Result;
 use itertools::Itertools;
 use log::debug;
 use ratatui::{

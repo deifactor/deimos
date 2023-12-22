@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use eyre::{eyre, Result};
 use itertools::Itertools;
 use lofty::{Accessor, ItemKey, TaggedFileExt};
 use ordered_float::OrderedFloat;
@@ -157,10 +157,12 @@ impl Track {
         let stream = probed
             .format
             .default_track()
-            .context("couldn't find a default track")?;
+            .ok_or_else(|| eyre!("couldn't find a default track"))?;
 
         let tagged_file = lofty::read_from_path(path)?;
-        let tag = tagged_file.primary_tag().context("no tags found")?;
+        let tag = tagged_file
+            .primary_tag()
+            .ok_or_else(|| eyre!("no tags found"))?;
         let artist = tag
             .get_string(&ItemKey::AlbumArtist)
             .or(tag.get_string(&ItemKey::TrackArtist));

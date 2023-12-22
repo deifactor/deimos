@@ -4,12 +4,12 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{Context, Result};
 use cpal::{
     traits::{DeviceTrait, HostTrait},
     Sample, Stream,
 };
 use educe::Educe;
+use eyre::{eyre, Result};
 use itertools::Itertools;
 use log::error;
 use symphonia::core::audio::{AudioBuffer, SampleBuffer};
@@ -60,7 +60,7 @@ impl Player {
         let host = cpal::default_host();
         let device = host
             .default_output_device()
-            .context("no default output device")?;
+            .ok_or_else(|| eyre!("no default output device"))?;
         let source: Arc<Mutex<Option<Source>>> = Arc::new(Mutex::new(None));
         let source_clone = Arc::clone(&source);
         let paused = Arc::new(RwLock::new(true));

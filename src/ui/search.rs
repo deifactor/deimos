@@ -1,6 +1,6 @@
 use std::{cell::RefCell, sync::Arc};
 
-use anyhow::Result;
+use eyre::Result;
 use itertools::Itertools;
 use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},

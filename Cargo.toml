@@ -7,13 +7,14 @@ homepage = "http://github.com/deifactor/deimos"
 repository = "http://github.com/deifactor/deimos"
 
 [dependencies]
-anyhow = { version = "1.0.71", features = ["backtrace"] }
+color-eyre = "0.6.2"
 cpal = "0.15.2"
 crossterm = { version = "0.27.0", features = ["event-stream"] }
 directories = "5.0.1"
 educe = { version = "0.4.23", default-features = false, features = ["Debug"] }
 enum-iterator = "1.4.1"
 env_logger = "0.10.0"
+eyre = "0.6.11"
 itertools = "0.11.0"
 lofty = "0.16.1"
 log = "0.4.20"

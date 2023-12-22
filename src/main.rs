@@ -9,7 +9,6 @@ use std::{
     io, panic,
 };
 
-use anyhow::Result;
 use app::App;
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, EventStream},
@@ -17,6 +16,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use directories::{ProjectDirs, UserDirs};
+use eyre::Result;
 use library::Library;
 use log::debug;
 use ratatui::{backend::CrosstermBackend, Terminal};
@@ -25,6 +25,7 @@ use tokio_stream::StreamExt;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
+    color_eyre::install()?;
     let project_dirs = ProjectDirs::from("ai", "ext0l", "deimos").unwrap();
 
     // set up logging
@@ -48,7 +49,7 @@ async fn main() -> Result<()> {
         let library = Library::scan(&library_path)?;
         fs::create_dir_all(cache_path.parent().unwrap())?;
         library.save(&cache_path)?;
-        anyhow::Ok(library)
+        eyre::Ok(library)
     })?;
 
     let app = App::new(library);

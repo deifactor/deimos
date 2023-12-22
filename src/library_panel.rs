@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use anyhow::Result;
 use enum_iterator::Sequence;
+use eyre::Result;
 use itertools::Itertools;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
@@ -91,7 +91,7 @@ impl LibraryPanel {
         frame: &mut ratatui::Frame,
         area: Rect,
         current_track: Option<Arc<Track>>,
-    ) -> anyhow::Result<()> {
+    ) -> eyre::Result<()> {
         let layout = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])

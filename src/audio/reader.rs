@@ -1,6 +1,6 @@
 use std::{fs::File, path::Path, time::Duration};
 
-use anyhow::{bail, Result};
+use eyre::{bail, Result};
 use symphonia::{
     core::{
         audio::AudioBuffer,

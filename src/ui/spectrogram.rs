@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use eyre::{anyhow, Result};
 use itertools::Itertools;
 use ratatui::widgets::Sparkline;
 use spectrum_analyzer::{
