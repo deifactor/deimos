@@ -61,7 +61,10 @@ impl Search {
     }
 
     pub fn selected_result(&self) -> Option<SearchResult> {
-        self.results.get(0).cloned()
+        self.state
+            .borrow()
+            .selected()
+            .map(|i| self.results[i].clone())
     }
 
     fn render_result(&self, track: &SearchResult) -> ListItem<'static> {
@@ -104,6 +107,11 @@ impl Search {
             .map(SearchResult::Track);
 
         self.results = artists.chain(albums).chain(tracks).collect_vec();
+        *self.state.borrow_mut().selected_mut() = if self.results.is_empty() {
+            None
+        } else {
+            Some(0)
+        };
 
         Ok(())
     }
@@ -132,5 +140,11 @@ impl Search {
         .block(block);
         frame.render_stateful_widget(results, root[1], &mut self.state.borrow_mut());
         Ok(())
+    }
+
+    pub fn move_cursor(&mut self, delta: isize) {
+        if let Some(s) = self.state.borrow_mut().selected_mut().as_mut() {
+            *s = s.saturating_add_signed(delta).min(self.results.len() - 1);
+        }
     }
 }

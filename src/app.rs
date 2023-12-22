@@ -241,7 +241,7 @@ impl App {
                     Panel::Library => {
                         self.library_panel.move_selection(&self.library, delta)?;
                     }
-                    Panel::Search => todo!(),
+                    Panel::Search => self.search.move_cursor(delta),
                 }
             }
             NextFocus => {
