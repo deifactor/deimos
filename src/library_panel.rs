@@ -9,7 +9,7 @@ use crate::{
     library::{Library, Track},
     ui::{
         artist_album_list::ArtistAlbumList,
-        search::SearchResult,
+        search::SearchItem,
         track_list::{TrackList, TrackListItem},
         ActiveState, Ui,
     },
@@ -30,7 +30,7 @@ pub struct LibraryPanel {
 }
 
 impl LibraryPanel {
-    pub(crate) fn select_entity(&mut self, library: &Library, result: &SearchResult) -> Result<()> {
+    pub(crate) fn select_entity(&mut self, library: &Library, result: &SearchItem) -> Result<()> {
         let artist = result.album_artist();
         let album = result.album();
         self.artist_album_list.select(artist, album)?;

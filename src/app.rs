@@ -319,7 +319,7 @@ impl App {
                 }
             },
             Panel::Search => {
-                let Some(selected) = self.search.selected_result() else {
+                let Some(selected) = self.search.selected_item() else {
                     return Ok(());
                 };
                 self.active_panel = Panel::Library;

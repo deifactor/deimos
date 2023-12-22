@@ -1,4 +1,6 @@
-use std::{cell::RefCell, cmp::Reverse, fmt::Display, ops::DerefMut, sync::Arc};
+use std::{
+    cell::RefCell, cmp::Reverse, collections::HashSet, fmt::Display, ops::DerefMut, sync::Arc,
+};
 
 use eyre::Result;
 use itertools::Itertools;
@@ -23,7 +25,7 @@ use super::ActiveState;
 
 /// Things that match the search.
 #[derive(Debug, Clone)]
-pub enum SearchResult {
+pub enum SearchItem {
     Artist(ArtistName),
     Album(AlbumName, ArtistName),
     Track(Arc<Track>),
@@ -31,12 +33,12 @@ pub enum SearchResult {
 
 static MATCHER: Lazy<Mutex<Matcher>> = Lazy::new(|| Mutex::new(Matcher::new(Config::DEFAULT)));
 
-impl Display for SearchResult {
+impl Display for SearchItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SearchResult::Artist(artist) => write!(f, "{}", artist),
-            SearchResult::Album(album, artist) => write!(f, "{} - {}", artist, album),
-            SearchResult::Track(track) => write!(
+            SearchItem::Artist(artist) => write!(f, "{}", artist),
+            SearchItem::Album(album, artist) => write!(f, "{} - {}", artist, album),
+            SearchItem::Track(track) => write!(
                 f,
                 "{} - {} - {}",
                 track.title.as_deref().unwrap_or("<unknown>"),
@@ -47,48 +49,75 @@ impl Display for SearchResult {
     }
 }
 
-impl SearchResult {
+impl SearchItem {
     pub fn album_artist(&self) -> &ArtistName {
         match self {
-            SearchResult::Artist(artist) => artist,
-            SearchResult::Album(_, artist) => artist,
-            SearchResult::Track(track) => &track.artist,
+            SearchItem::Artist(artist) => artist,
+            SearchItem::Album(_, artist) => artist,
+            SearchItem::Track(track) => &track.artist,
         }
     }
 
     pub fn album(&self) -> Option<&AlbumName> {
         match self {
-            SearchResult::Artist(_) => None,
-            SearchResult::Album(album, _) => Some(album),
-            SearchResult::Track(track) => Some(&track.album),
+            SearchItem::Artist(_) => None,
+            SearchItem::Album(album, _) => Some(album),
+            SearchItem::Track(track) => Some(&track.album),
         }
     }
 
     pub fn track_title(&self) -> Option<&str> {
         match self {
-            SearchResult::Track(track) => track.title.as_deref(),
+            SearchItem::Track(track) => track.title.as_deref(),
             _ => None,
         }
     }
+}
 
-    /// Matches the given pattern against this. If success, returns (score, indices). Indices are
-    /// guaranteed to be sorted.
-    pub fn matches(&self, pattern: &Pattern) -> Option<(u32, Vec<u32>)> {
+/// A slice of text used to display a search result.
+#[derive(Debug)]
+#[allow(dead_code)]
+struct SearchTextSegment {
+    text: String,
+    matched: bool,
+}
+
+#[derive(Debug)]
+pub struct SearchResult {
+    item: SearchItem,
+    score: u32,
+    #[allow(dead_code)]
+    segments: Vec<SearchTextSegment>,
+}
+
+impl SearchResult {
+    pub fn try_from_item(item: SearchItem, pattern: &Pattern) -> Option<Self> {
         let mut buf = vec![];
-        let displayed = self.to_string();
+        let displayed = item.to_string();
         let haystack = Utf32Str::new(&displayed, &mut buf);
         let mut indices = vec![];
-        pattern
-            .indices(
-                haystack,
-                MATCHER.try_lock().unwrap().deref_mut(),
-                &mut indices,
-            )
-            .map(|s| {
-                indices.sort_unstable();
-                indices.dedup();
-                (s, indices)
+        let score = pattern.indices(
+            haystack,
+            MATCHER.try_lock().unwrap().deref_mut(),
+            &mut indices,
+        )?;
+
+        // XXX: do this better
+        let indices: HashSet<u32> = HashSet::from_iter(indices);
+        let segments = haystack
+            .chars()
+            .enumerate()
+            .map(|(i, c)| SearchTextSegment {
+                text: c.to_string(),
+                matched: indices.contains(&(i as u32)),
             })
+            .collect_vec();
+
+        Some(Self {
+            item,
+            score,
+            segments,
+        })
     }
 }
 
@@ -104,11 +133,11 @@ impl Search {
         &self.query
     }
 
-    pub fn selected_result(&self) -> Option<SearchResult> {
+    pub fn selected_item(&self) -> Option<SearchItem> {
         self.state
             .borrow()
             .selected()
-            .map(|i| self.results[i].clone())
+            .map(|i| self.results[i].item.clone())
     }
 
     pub fn run_query(&mut self, library: &Library, query: impl AsRef<str>) -> Result<()> {
@@ -120,23 +149,22 @@ impl Search {
         let artists = library
             .artists()
             .map(|a| a.name.clone())
-            .map(SearchResult::Artist);
+            .map(SearchItem::Artist);
 
         let albums = library
             .albums_with_artist()
-            .map(|(album, artist)| SearchResult::Album(album.name.clone(), artist.name.clone()));
+            .map(|(album, artist)| SearchItem::Album(album.name.clone(), artist.name.clone()));
 
-        let tracks = library.tracks().map(SearchResult::Track);
+        let tracks = library.tracks().map(SearchItem::Track);
 
-        let mut scored = artists
+        let mut results = artists
             .chain(albums)
             .chain(tracks)
-            .filter_map(|result| result.matches(&pattern).map(|score| (result, score)))
+            .filter_map(|item| SearchResult::try_from_item(item, &pattern))
             .collect_vec();
-        scored.sort_by_key(|(_, (score, _))| Reverse(*score));
-        scored.reverse();
+        results.sort_by_key(|result| Reverse(result.score));
 
-        self.results = scored.into_iter().map(|(result, _)| result).collect_vec();
+        self.results = results;
         *self.state.borrow_mut().selected_mut() = if self.results.is_empty() {
             None
         } else {
@@ -163,7 +191,7 @@ impl Search {
         let results = List::new(
             self.results
                 .iter()
-                .map(|track| ListItem::new(track.to_string()))
+                .map(|result| ListItem::new(result.item.to_string()))
                 .collect_vec(),
         )
         .highlight_style(Style::default().fg(Color::Cyan).bg(Color::Rgb(30, 30, 30)))
