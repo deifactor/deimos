@@ -37,6 +37,9 @@ impl LibraryPanel {
         self.update_track_list(library)?;
         if let Some(title) = result.track_title() {
             self.track_list.select(title);
+            self.focus = PanelItem::TrackList;
+        } else {
+            self.focus = PanelItem::ArtistAlbumList;
         }
         Ok(())
     }
