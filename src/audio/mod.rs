@@ -47,6 +47,7 @@ pub enum PlayerMessage {
         buffer: AudioBuffer<f32>,
         timestamp: Duration,
     },
+    Finished,
 }
 
 #[derive(Debug, Default)]
@@ -138,7 +139,10 @@ impl Player {
                 timestamp: fragment.timestamp,
             }));
         });
-        let on_finish: FinishCallback = Box::new(|| ());
+        let tx_message = self.tx_message.clone();
+        let on_finish: FinishCallback = Box::new(move || {
+            let _ = tx_message.send(Message::Player(PlayerMessage::Finished));
+        });
         let source = Source::new(reader, on_decode, on_finish);
         *self.source.lock().unwrap() = Some(source);
         Ok(())

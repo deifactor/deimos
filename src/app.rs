@@ -210,6 +210,9 @@ impl App {
                 self.player.set_timestamp(Some(timestamp));
                 self.visualizer.update_spectrum(buffer)?;
             }
+            Player(PlayerMessage::Finished) => {
+                self.dispatch_command(self::Command::NextTrack)?;
+            }
         }
         Ok(())
     }
