@@ -94,13 +94,27 @@ impl AppTerminal {
         let backend = CrosstermBackend::new(io::stdout());
         let mut terminal = Terminal::new(backend)?;
         terminal.clear()?;
+
+        let original_hook = std::panic::take_hook();
+
+        // during panic, Drop gets called *after* the panic handler. restoring the terminal twice
+        // is harmless, so we don't need to track if this was already called.
+        std::panic::set_hook(Box::new(move |panic| {
+            AppTerminal::restore_terminal();
+            original_hook(panic);
+        }));
+
         Ok(Self(terminal))
+    }
+
+    fn restore_terminal() {
+        disable_raw_mode().unwrap();
+        execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture).unwrap();
     }
 }
 
 impl Drop for AppTerminal {
     fn drop(&mut self) {
-        disable_raw_mode().unwrap();
-        execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture).unwrap();
+        AppTerminal::restore_terminal()
     }
 }
