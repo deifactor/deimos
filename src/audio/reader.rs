@@ -88,6 +88,7 @@ impl SymphoniaReader {
                 track_id: None,
             },
         )?;
+        // necessary to do this any time there's a seek
         self.decoder.reset();
         Ok(())
     }

@@ -266,7 +266,10 @@ impl App {
                 } else {
                     now - Duration::from_secs(seconds.unsigned_abs())
                 };
-                self.player.seek(target)?;
+                if self.player.seek(target).is_err() {
+                    // can happen when seeking off the end, etc
+                    self.player.next()?;
+                }
                 self.visualizer.reset()?;
             }
             AddSongToQueue => {
