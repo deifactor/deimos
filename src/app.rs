@@ -264,7 +264,7 @@ impl App {
                 let target = if seconds > 0 {
                     now + Duration::from_secs(seconds.unsigned_abs())
                 } else {
-                    now - Duration::from_secs(seconds.unsigned_abs())
+                    now.saturating_sub(Duration::from_secs(seconds.unsigned_abs()))
                 };
                 if self.player.seek(target).is_err() {
                     // can happen when seeking off the end, etc
