@@ -1,12 +1,10 @@
-use std::{
-    cell::RefCell, cmp::Reverse, collections::HashSet, fmt::Display, ops::DerefMut, sync::Arc,
-};
+use std::{cell::RefCell, cmp::Reverse, collections::HashSet, ops::DerefMut, sync::Arc};
 
 use eyre::Result;
 use itertools::Itertools;
 use nucleo_matcher::{
     pattern::{CaseMatching, Pattern},
-    Config, Matcher, Utf32Str,
+    Config, Matcher, Utf32String,
 };
 use once_cell::sync::Lazy;
 use ratatui::{
@@ -34,22 +32,6 @@ pub enum SearchItem {
 
 static MATCHER: Lazy<Mutex<Matcher>> = Lazy::new(|| Mutex::new(Matcher::new(Config::DEFAULT)));
 
-impl Display for SearchItem {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SearchItem::Artist(artist) => write!(f, "{}", artist),
-            SearchItem::Album(album, artist) => write!(f, "{} - {}", artist, album),
-            SearchItem::Track(track) => write!(
-                f,
-                "{} - {} - {}",
-                track.title.as_deref().unwrap_or("<unknown>"),
-                track.artist,
-                track.album
-            ),
-        }
-    }
-}
-
 impl SearchItem {
     pub fn album_artist(&self) -> &ArtistName {
         match self {
@@ -74,15 +56,22 @@ impl SearchItem {
         }
     }
 
+    /// The search haystack that this matches against.
+    fn haystack(&self) -> Option<String> {
+        match self {
+            SearchItem::Artist(artist) => Some(artist.to_string()),
+            SearchItem::Album(album, _) => Some(album.to_string()),
+            SearchItem::Track(track) => track.title.clone(),
+        }
+    }
+
     /// If this matches the pattern, returns a result containing this as well as metadata about
     /// the match.
     pub fn match_against(self, pattern: &Pattern) -> Option<SearchResult> {
-        let mut buf = vec![];
-        let displayed = self.to_string();
-        let haystack = Utf32Str::new(&displayed, &mut buf);
+        let haystack = Utf32String::from(self.haystack()?);
         let mut indices = vec![];
         let score = pattern.indices(
-            haystack,
+            haystack.slice(..),
             MATCHER.try_lock().unwrap().deref_mut(),
             &mut indices,
         )?;
@@ -90,6 +79,7 @@ impl SearchItem {
         // XXX: do this better
         let indices: HashSet<u32> = HashSet::from_iter(indices);
         let segments = haystack
+            .slice(..)
             .chars()
             .enumerate()
             .map(|(i, c)| SearchTextSegment {
@@ -173,11 +163,13 @@ impl Search {
         Ok(())
     }
 
-    fn render_search_segment(&self, segments: &[SearchTextSegment]) -> ListItem<'static> {
+    fn render_result(&self, result: &SearchResult) -> ListItem<'static> {
+        // render the portion of the result with the match in it
+        let segments = &result.segments;
         let match_style = Style::default()
             .fg(Color::Blue)
             .add_modifier(Modifier::BOLD);
-        let spans = segments
+        let mut spans = segments
             .iter()
             .map(|segment| {
                 Span::styled(
@@ -190,6 +182,17 @@ impl Search {
                 )
             })
             .collect_vec();
+
+        match &result.item {
+            // artist
+            SearchItem::Artist(_) => (),
+            // album - artist
+            SearchItem::Album(_, artist) => spans.push(Span::raw(format!(" - {}", artist))),
+            // track - album - artist
+            SearchItem::Track(track) => {
+                spans.push(Span::raw(format!("- {} - {}", track.album, track.artist)))
+            }
+        }
         ListItem::new(Line {
             spans,
             alignment: None,
@@ -213,7 +216,7 @@ impl Search {
         let results = List::new(
             self.results
                 .iter()
-                .map(|result| self.render_search_segment(&result.segments))
+                .map(|result| self.render_result(result))
                 .collect_vec(),
         )
         .highlight_style(Style::default().fg(Color::Cyan).bg(Color::Rgb(30, 30, 30)))
