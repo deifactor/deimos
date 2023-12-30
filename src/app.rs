@@ -67,7 +67,7 @@ impl App {
     pub async fn run(
         mut self,
         terminal_events: impl Stream<Item = Event> + Send + Sync + 'static,
-        mut terminal: Terminal<CrosstermBackend<Stdout>>,
+        terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     ) -> Result<()> {
         self.library_panel.artist_album_list = ArtistAlbumList::new(&self.library);
 

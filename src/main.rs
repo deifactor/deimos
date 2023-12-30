@@ -6,7 +6,8 @@ mod ui;
 
 use std::{
     fs::{self, File},
-    io, panic,
+    io,
+    ops::{Deref, DerefMut},
 };
 
 use app::App;
@@ -58,43 +59,48 @@ async fn main() -> Result<()> {
 
     let app = App::new(library);
 
-    // do this late as we can so that errors won't get mangled
-    let terminal = prepare_terminal()?;
-
-    app.run(EventStream::new().filter_map(|ev| ev.ok()), terminal)
-        .await?;
-
-    restore_terminal()?;
+    let mut terminal = AppTerminal::new()?;
+    app.run(
+        EventStream::new().filter_map(|ev| ev.ok()),
+        terminal.deref_mut(),
+    )
+    .await?;
 
     Ok(())
 }
 
-/// Sets up the terminal for full-screen application mode.
-///
-/// This also installs a panic hook that will (call the original panic hook
-/// and) clean up the terminal state, meaning that even a panic should leave
-/// your terminal workable.
-fn prepare_terminal() -> Result<Terminal<CrosstermBackend<io::Stdout>>> {
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let original = panic::take_hook();
-    // we have to restore the terminal *before* the original handler since any
-    // messages it prints will get eaten
-    panic::set_hook(Box::new(move |panic| {
-        restore_terminal().unwrap();
-        original(panic);
-    }));
-    let backend = CrosstermBackend::new(io::stdout());
-    let mut terminal = Terminal::new(backend)?;
-    terminal.clear()?;
-    Ok(terminal)
+/// Wrapper around a [`Terminal`] that automatically sets it up and restores it.
+struct AppTerminal(Terminal<CrosstermBackend<io::Stdout>>);
+
+impl Deref for AppTerminal {
+    type Target = Terminal<CrosstermBackend<io::Stdout>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
-/// Cleans up the terminal state. prepare_terminal() will call this on panic,
-/// but you still need to manually call it too.
-fn restore_terminal() -> Result<()> {
-    disable_raw_mode()?;
-    execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
-    Ok(())
+impl DerefMut for AppTerminal {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl AppTerminal {
+    fn new() -> Result<Self> {
+        enable_raw_mode()?;
+        let mut stdout = io::stdout();
+        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+        let backend = CrosstermBackend::new(io::stdout());
+        let mut terminal = Terminal::new(backend)?;
+        terminal.clear()?;
+        Ok(Self(terminal))
+    }
+}
+
+impl Drop for AppTerminal {
+    fn drop(&mut self) {
+        disable_raw_mode().unwrap();
+        execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture).unwrap();
+    }
 }
