@@ -173,9 +173,9 @@ impl Track {
         Ok(Self {
             number: tag.track(),
             path: path.to_owned(),
-            title: tag.title().map(|s| s.into_owned()),
-            album: tag.album().map(|s| s.into_owned()).into(),
-            artist: artist.map(|s| s.to_owned()).into(),
+            title: tag.title().map(normalize),
+            album: tag.album().map(normalize).into(),
+            artist: artist.map(normalize).into(),
             length: duration.into(),
         })
     }
@@ -208,4 +208,19 @@ impl From<Option<String>> for AlbumName {
     fn from(value: Option<String>) -> Self {
         AlbumName(value)
     }
+}
+
+/// String normalization, Removes characters nucleo doesn't handle.
+fn normalize(s: impl AsRef<str>) -> String {
+    // not the most efficient, but this only runs on library load so it's fine
+    let normalize_map = HashMap::from([
+        ('\u{2018}', '\''),
+        ('\u{2019}', '\''),
+        ('\u{201c}', '"'),
+        ('\u{201d}', '"'),
+    ]);
+    s.as_ref()
+        .chars()
+        .map(|c| normalize_map.get(&c).copied().unwrap_or(c))
+        .collect()
 }
