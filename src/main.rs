@@ -26,6 +26,10 @@ use tokio_stream::StreamExt;
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     color_eyre::install()?;
+    // when running with backtrace capture enabled, constructing the first error variant in a
+    // program is more expensive (on the order of milliseconds). see
+    // https://github.com/eyre-rs/color-eyre/issues/148.
+    let _ = eyre::eyre!("unused");
     let project_dirs = ProjectDirs::from("ai", "ext0l", "deimos").unwrap();
 
     // set up logging
