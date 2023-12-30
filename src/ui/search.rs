@@ -73,26 +73,12 @@ impl SearchItem {
             _ => None,
         }
     }
-}
 
-/// A slice of text used to display a search result.
-#[derive(Debug)]
-struct SearchTextSegment {
-    text: String,
-    matched: bool,
-}
-
-#[derive(Debug)]
-pub struct SearchResult {
-    item: SearchItem,
-    score: u32,
-    segments: Vec<SearchTextSegment>,
-}
-
-impl SearchResult {
-    pub fn try_from_item(item: SearchItem, pattern: &Pattern) -> Option<Self> {
+    /// If this matches the pattern, returns a result containing this as well as metadata about
+    /// the match.
+    pub fn match_against(self, pattern: &Pattern) -> Option<SearchResult> {
         let mut buf = vec![];
-        let displayed = item.to_string();
+        let displayed = self.to_string();
         let haystack = Utf32Str::new(&displayed, &mut buf);
         let mut indices = vec![];
         let score = pattern.indices(
@@ -112,12 +98,26 @@ impl SearchResult {
             })
             .collect_vec();
 
-        Some(Self {
-            item,
+        Some(SearchResult {
+            item: self,
             score,
             segments,
         })
     }
+}
+
+/// A slice of text used to display a search result.
+#[derive(Debug)]
+struct SearchTextSegment {
+    text: String,
+    matched: bool,
+}
+
+#[derive(Debug)]
+pub struct SearchResult {
+    item: SearchItem,
+    score: u32,
+    segments: Vec<SearchTextSegment>,
 }
 
 #[derive(Debug, Default)]
@@ -159,7 +159,7 @@ impl Search {
         let mut results = artists
             .chain(albums)
             .chain(tracks)
-            .filter_map(|item| SearchResult::try_from_item(item, &pattern))
+            .filter_map(|item| item.match_against(&pattern))
             .collect_vec();
         results.sort_by_key(|result| Reverse(result.score));
 
