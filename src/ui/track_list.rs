@@ -53,10 +53,7 @@ pub struct TrackList {
 /// Methods for manipulating the state
 impl TrackList {
     pub fn new(items: Vec<TrackListItem>) -> Self {
-        Self {
-            items,
-            state: RefCell::new(ListState::default()),
-        }
+        Self { items, state: RefCell::new(ListState::default()) }
     }
 
     /// Move the selection by `amount`, which must either be -1 or 1. If the selection would move
@@ -67,11 +64,9 @@ impl TrackList {
             return;
         }
         let candidate = match self.state.borrow().selected() {
-            Some(selected) => Some(
-                selected
-                    .saturating_add_signed(amount)
-                    .min(self.items.len() - 1),
-            ),
+            Some(selected) => {
+                Some(selected.saturating_add_signed(amount).min(self.items.len() - 1))
+            }
             None if amount > 0 => Some(0),
             None => None,
         };
@@ -91,22 +86,17 @@ impl TrackList {
     }
 
     pub fn select(&mut self, title: &str) {
-        self.state
-            .get_mut()
-            .select(self.items.iter().position(|track| match track {
-                TrackListItem::Track(track) => track.title.as_deref() == Some(title),
-                _ => false,
-            }))
+        self.state.get_mut().select(self.items.iter().position(|track| match track {
+            TrackListItem::Track(track) => track.title.as_deref() == Some(title),
+            _ => false,
+        }))
     }
 
     pub fn selected(&self) -> Option<Arc<Track>> {
-        self.state
-            .borrow()
-            .selected()
-            .map(|i| match &self.items[i] {
-                TrackListItem::Track(track) => track.clone(),
-                _ => panic!("Somehow selected a non-track"),
-            })
+        self.state.borrow().selected().map(|i| match &self.items[i] {
+            TrackListItem::Track(track) => track.clone(),
+            _ => panic!("Somehow selected a non-track"),
+        })
     }
 
     /// Iterates over the actual tracks currently being displayed, in order.
@@ -125,10 +115,8 @@ impl TrackList {
         area: Rect,
         current_track: Option<Arc<Track>>,
     ) -> Result<()> {
-        let block = Block::default()
-            .title("Tracks")
-            .borders(Borders::ALL)
-            .border_style(ui.border(state));
+        let block =
+            Block::default().title("Tracks").borders(Borders::ALL).border_style(ui.border(state));
 
         let list = List::new(
             self.items

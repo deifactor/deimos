@@ -56,10 +56,7 @@ impl ArtistAlbumList {
             .map(|artist| {
                 let mut albums = artist.albums.keys().cloned().collect_vec();
                 albums.sort_unstable();
-                ArtistItem {
-                    artist: artist.name.clone(),
-                    albums,
-                }
+                ArtistItem { artist: artist.name.clone(), albums }
             })
             .collect_vec();
         artists.sort_unstable_by_key(|item| item.artist.clone());
@@ -90,11 +87,7 @@ impl ArtistAlbumList {
             return;
         }
         self.selected = match self.selected {
-            Some(selected) => Some(
-                selected
-                    .saturating_add_signed(amount)
-                    .min(self.rows.len() - 1),
-            ),
+            Some(selected) => Some(selected.saturating_add_signed(amount).min(self.rows.len() - 1)),
             None if amount > 0 => Some(0),
             None => None,
         }
@@ -120,16 +113,10 @@ impl ArtistAlbumList {
     fn recompute_rows(&mut self) {
         self.rows.clear();
         for (artist_idx, item) in self.artists.iter().enumerate() {
-            self.rows.push(RowIndex {
-                artist: artist_idx,
-                album: None,
-            });
+            self.rows.push(RowIndex { artist: artist_idx, album: None });
             if self.expanded.contains(&artist_idx) {
                 for album_idx in 0..item.albums.len() {
-                    self.rows.push(RowIndex {
-                        artist: artist_idx,
-                        album: Some(album_idx),
-                    });
+                    self.rows.push(RowIndex { artist: artist_idx, album: Some(album_idx) });
                 }
             }
         }
@@ -154,10 +141,8 @@ impl ArtistAlbumList {
             .transpose()?;
         self.expanded.insert(artist_index);
         self.recompute_rows();
-        self.selected = self
-            .rows
-            .iter()
-            .position(|row| row.artist == artist_index && row.album == album_index);
+        self.selected =
+            self.rows.iter().position(|row| row.artist == artist_index && row.album == album_index);
         Ok(())
     }
 }
@@ -195,18 +180,11 @@ impl ArtistAlbumList {
             );
         }
 
-        for (index, row) in self
-            .rows
-            .iter()
-            .enumerate()
-            .skip(self.offset.get())
-            .take(inner.height.into())
+        for (index, row) in
+            self.rows.iter().enumerate().skip(self.offset.get()).take(inner.height.into())
         {
-            let style = if self.selected == Some(index) {
-                self.highlight_style
-            } else {
-                Style::default()
-            };
+            let style =
+                if self.selected == Some(index) { self.highlight_style } else { Style::default() };
             let y = index - self.offset.get();
             let mut text = self.text(*row);
             // need to manually truncate; setting the wrap to `trim: true` will also trim leading whitespace

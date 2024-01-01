@@ -24,12 +24,7 @@ pub struct VisualizerOptions {
 
 impl Default for VisualizerOptions {
     fn default() -> Self {
-        Self {
-            window_length: 4096,
-            decay: 0.2,
-            min_freq: 100.0,
-            max_freq: 3000.0,
-        }
+        Self { window_length: 4096, decay: 0.2, min_freq: 100.0, max_freq: 3000.0 }
     }
 }
 
@@ -59,12 +54,7 @@ impl Visualizer {
             Some(&divide_by_N_sqrt),
         )
         .map_err(|e| anyhow!("{:?}", e))?;
-        Ok(Self {
-            buffer: vec![0.0; options.window_length],
-            options,
-            spectrum,
-            amplitudes: None,
-        })
+        Ok(Self { buffer: vec![0.0; options.window_length], options, spectrum, amplitudes: None })
     }
 
     /// Resets the visualizer's state as if freshly-created.
@@ -87,22 +77,15 @@ impl Visualizer {
             self.buffer.extend(buffer.chan(0));
         } else {
             // downmix to mono if it's 2-channel or more
-            self.buffer.extend(
-                buffer
-                    .chan(0)
-                    .iter()
-                    .zip(buffer.chan(1))
-                    .map(|(a, b)| (a + b) / 2.0),
-            )
+            self.buffer
+                .extend(buffer.chan(0).iter().zip(buffer.chan(1)).map(|(a, b)| (a + b) / 2.0))
         }
 
         if self.buffer.len() < self.options.window_length {
             return Ok(());
         }
         // if we have enough samples, take the last window_length and FFT
-        self.buffer = self
-            .buffer
-            .split_off(self.buffer.len() - self.options.window_length);
+        self.buffer = self.buffer.split_off(self.buffer.len() - self.options.window_length);
 
         self.spectrum = samples_fft_to_spectrum(
             &hann_window(&self.buffer),
@@ -118,11 +101,7 @@ impl Visualizer {
     /// sizes, just uses `new_amplitudes`, or else lerps between them using the
     /// decay value. After calling this, `self.amplitudes` is always `Some`.
     fn merge_amplitudes(&mut self, new_amplitudes: Vec<f32>) {
-        if self
-            .amplitudes
-            .as_ref()
-            .map_or(true, |vec| vec.len() != new_amplitudes.len())
-        {
+        if self.amplitudes.as_ref().map_or(true, |vec| vec.len() != new_amplitudes.len()) {
             self.amplitudes = Some(new_amplitudes);
         } else {
             let amplitudes = self.amplitudes.as_mut().unwrap();
@@ -159,13 +138,8 @@ impl Visualizer {
             .collect_vec();
         self.merge_amplitudes(new_amplitudes);
 
-        let u64_amplitudes = self
-            .amplitudes
-            .as_ref()
-            .unwrap()
-            .iter()
-            .map(|x| (x * 64.0) as u64)
-            .collect_vec();
+        let u64_amplitudes =
+            self.amplitudes.as_ref().unwrap().iter().map(|x| (x * 64.0) as u64).collect_vec();
 
         let sparkline = Sparkline::default().data(&u64_amplitudes).max(64);
         frame.render_widget(sparkline, area);

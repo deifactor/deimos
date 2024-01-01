@@ -36,10 +36,7 @@ pub struct Artist {
 
 impl Artist {
     pub fn new(name: ArtistName) -> Self {
-        Self {
-            name,
-            albums: HashMap::new(),
-        }
+        Self { name, albums: HashMap::new() }
     }
 }
 
@@ -56,10 +53,7 @@ pub struct Album {
 
 impl Album {
     pub fn new(name: AlbumName) -> Self {
-        Self {
-            name,
-            tracks: vec![],
-        }
+        Self { name, tracks: vec![] }
     }
 }
 
@@ -129,8 +123,7 @@ impl Library {
     }
 
     pub fn albums_with_artist(&self) -> impl Iterator<Item = (&Album, &Artist)> {
-        self.artists()
-            .flat_map(|artist| artist.albums.values().map(move |album| (album, artist)))
+        self.artists().flat_map(|artist| artist.albums.values().map(move |album| (album, artist)))
     }
 
     pub fn albums(&self) -> impl Iterator<Item = &Album> {
@@ -154,18 +147,13 @@ impl Track {
             &Default::default(),
             &Default::default(),
         )?;
-        let stream = probed
-            .format
-            .default_track()
-            .ok_or_else(|| eyre!("couldn't find a default track"))?;
+        let stream =
+            probed.format.default_track().ok_or_else(|| eyre!("couldn't find a default track"))?;
 
         let tagged_file = lofty::read_from_path(path)?;
-        let tag = tagged_file
-            .primary_tag()
-            .ok_or_else(|| eyre!("no tags found"))?;
-        let artist = tag
-            .get_string(&ItemKey::AlbumArtist)
-            .or(tag.get_string(&ItemKey::TrackArtist));
+        let tag = tagged_file.primary_tag().ok_or_else(|| eyre!("no tags found"))?;
+        let artist =
+            tag.get_string(&ItemKey::AlbumArtist).or(tag.get_string(&ItemKey::TrackArtist));
         let time_base = stream.codec_params.time_base.unwrap();
         let duration = time_base.calc_time(stream.codec_params.n_frames.unwrap());
         let duration = duration.seconds as f64 + duration.frac;
@@ -219,8 +207,5 @@ fn normalize(s: impl AsRef<str>) -> String {
         ('\u{201c}', '"'),
         ('\u{201d}', '"'),
     ]);
-    s.as_ref()
-        .chars()
-        .map(|c| normalize_map.get(&c).copied().unwrap_or(c))
-        .collect()
+    s.as_ref().chars().map(|c| normalize_map.get(&c).copied().unwrap_or(c)).collect()
 }

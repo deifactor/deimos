@@ -38,9 +38,7 @@ async fn main() -> Result<()> {
     let log_target = project_dirs.data_local_dir().join("deimos.log");
     fs::create_dir_all(log_target.parent().unwrap())?;
     env_logger::builder()
-        .target(env_logger::Target::Pipe(Box::new(File::create(
-            log_target,
-        )?)))
+        .target(env_logger::Target::Pipe(Box::new(File::create(log_target)?)))
         .init();
 
     // load library
@@ -61,11 +59,7 @@ async fn main() -> Result<()> {
     let app = App::new(library);
 
     let mut terminal = AppTerminal::new()?;
-    app.run(
-        EventStream::new().filter_map(|ev| ev.ok()),
-        terminal.deref_mut(),
-    )
-    .await?;
+    app.run(EventStream::new().filter_map(|ev| ev.ok()), terminal.deref_mut()).await?;
 
     Ok(())
 }

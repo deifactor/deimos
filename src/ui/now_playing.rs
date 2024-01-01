@@ -43,9 +43,7 @@ impl NowPlaying {
         let total_mins = (track.length / 60.0).floor() as u64;
         let total_secs = (track.length % 60.0).ceil() as u64;
         frame.render_widget(
-            Paragraph::new(format!(
-                "{mins:0>2}:{secs:0>2} / {total_mins:0>2}:{total_secs:0>2}"
-            )),
+            Paragraph::new(format!("{mins:0>2}:{secs:0>2} / {total_mins:0>2}:{total_secs:0>2}")),
             chunks[1],
         );
 

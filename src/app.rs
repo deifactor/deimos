@@ -115,31 +115,21 @@ impl App {
             .constraints([Constraint::Min(10), Constraint::Max(6)])
             .split(f.size());
         match self.active_panel {
-            Panel::Library => self
-                .library_panel
-                .draw(&self.ui, f, root[0], player.current())?,
+            Panel::Library => self.library_panel.draw(&self.ui, f, root[0], player.current())?,
             Panel::Search => self.search.draw(&self.ui, f, root[0])?,
         }
         let bottom = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
             .split(root[1]);
-        NowPlaying {
-            timestamp: player.timestamp(),
-            track: player.current(),
-        }
-        .draw(&self.ui, f, bottom[0])?;
+        NowPlaying { timestamp: player.timestamp(), track: player.current() }
+            .draw(&self.ui, f, bottom[0])?;
         self.visualizer.draw(&self.ui, f, bottom[1])?;
         Ok(())
     }
 
     fn lookup_binding(&self, ev: Event) -> Option<Message> {
-        let Event::Key(KeyEvent {
-            code,
-            kind: KeyEventKind::Press,
-            ..
-        }) = ev
-        else {
+        let Event::Key(KeyEvent { code, kind: KeyEventKind::Press, .. }) = ev else {
             return None;
         };
         self.key_to_command(code).map(Message::Command)
@@ -245,8 +235,7 @@ impl App {
                 self.search = Search::default();
             }
             SearchInput(c) => {
-                self.search
-                    .run_query(&self.library, format!("{}{}", self.search.query(), c))?;
+                self.search.run_query(&self.library, format!("{}{}", self.search.query(), c))?;
             }
             SearchBackspace => {
                 let mut chars = self.search.query().chars();
@@ -309,10 +298,7 @@ impl App {
             PreviousOrSeekToStart => {
                 const MIN_DURATION_TO_SEEK: Duration = Duration::from_secs(5);
                 let mut player = self.player.write().await;
-                if player
-                    .timestamp()
-                    .map_or(false, |dur| dur >= MIN_DURATION_TO_SEEK)
-                {
+                if player.timestamp().map_or(false, |dur| dur >= MIN_DURATION_TO_SEEK) {
                     player.seek(Duration::ZERO)?;
                 } else {
                     player.previous()?;

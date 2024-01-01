@@ -88,11 +88,7 @@ impl SearchItem {
             })
             .collect_vec();
 
-        Some(SearchResult {
-            item: self,
-            score,
-            segments,
-        })
+        Some(SearchResult { item: self, score, segments })
     }
 }
 
@@ -123,10 +119,7 @@ impl Search {
     }
 
     pub fn selected_item(&self) -> Option<SearchItem> {
-        self.state
-            .borrow()
-            .selected()
-            .map(|i| self.results[i].item.clone())
+        self.state.borrow().selected().map(|i| self.results[i].item.clone())
     }
 
     pub fn run_query(&mut self, library: &Library, query: impl AsRef<str>) -> Result<()> {
@@ -135,10 +128,7 @@ impl Search {
 
         let pattern = Pattern::parse(query, CaseMatching::Ignore);
 
-        let artists = library
-            .artists()
-            .map(|a| a.name.clone())
-            .map(SearchItem::Artist);
+        let artists = library.artists().map(|a| a.name.clone()).map(SearchItem::Artist);
 
         let albums = library
             .albums_with_artist()
@@ -154,11 +144,8 @@ impl Search {
         results.sort_by_key(|result| Reverse(result.score));
 
         self.results = results;
-        *self.state.borrow_mut().selected_mut() = if self.results.is_empty() {
-            None
-        } else {
-            Some(0)
-        };
+        *self.state.borrow_mut().selected_mut() =
+            if self.results.is_empty() { None } else { Some(0) };
 
         Ok(())
     }
@@ -166,19 +153,13 @@ impl Search {
     fn render_result(&self, result: &SearchResult) -> ListItem<'static> {
         // render the portion of the result with the match in it
         let segments = &result.segments;
-        let match_style = Style::default()
-            .fg(Color::Blue)
-            .add_modifier(Modifier::BOLD);
+        let match_style = Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD);
         let mut spans = segments
             .iter()
             .map(|segment| {
                 Span::styled(
                     segment.text.clone(),
-                    if segment.matched {
-                        match_style
-                    } else {
-                        Style::default()
-                    },
+                    if segment.matched { match_style } else { Style::default() },
                 )
             })
             .collect_vec();
@@ -193,10 +174,7 @@ impl Search {
                 spans.push(Span::raw(format!("- {} - {}", track.album, track.artist)))
             }
         }
-        ListItem::new(Line {
-            spans,
-            alignment: None,
-        })
+        ListItem::new(Line { spans, alignment: None })
     }
 
     pub fn draw(&self, ui: &super::Ui, frame: &mut Frame, area: Rect) -> Result<()> {
@@ -213,14 +191,10 @@ impl Search {
         let query = Paragraph::new(self.query.as_str());
         frame.render_widget(query, root[0]);
 
-        let results = List::new(
-            self.results
-                .iter()
-                .map(|result| self.render_result(result))
-                .collect_vec(),
-        )
-        .highlight_style(Style::default().fg(Color::Cyan).bg(Color::Rgb(30, 30, 30)))
-        .block(block);
+        let results =
+            List::new(self.results.iter().map(|result| self.render_result(result)).collect_vec())
+                .highlight_style(Style::default().fg(Color::Cyan).bg(Color::Rgb(30, 30, 30)))
+                .block(block);
         frame.render_stateful_widget(results, root[1], &mut self.state.borrow_mut());
         Ok(())
     }

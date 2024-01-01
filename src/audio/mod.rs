@@ -63,9 +63,8 @@ struct PlayQueue {
 impl Player {
     pub fn new(tx_message: UnboundedSender<Message>) -> Result<Self> {
         let host = cpal::default_host();
-        let device = host
-            .default_output_device()
-            .ok_or_else(|| eyre!("no default output device"))?;
+        let device =
+            host.default_output_device().ok_or_else(|| eyre!("no default output device"))?;
         let source: Arc<Mutex<Option<Source>>> = Arc::new(Mutex::new(None));
         let source_clone = Arc::clone(&source);
         let paused = Arc::new(RwLock::new(true));
@@ -78,9 +77,8 @@ impl Player {
                 match source_clone.lock().unwrap().as_mut() {
                     Some(iter) if !*paused_clone.read().unwrap() => {
                         // copy from src to dst, zeroing the rest
-                        for (dst, src) in data
-                            .iter_mut()
-                            .zip(iter.chain(iter::repeat(f32::EQUILIBRIUM)))
+                        for (dst, src) in
+                            data.iter_mut().zip(iter.chain(iter::repeat(f32::EQUILIBRIUM)))
                         {
                             *dst = src
                         }
@@ -194,10 +192,7 @@ impl Player {
     /// Moves to the next track. If this was the last track, equivalent to stop().
     pub fn next(&mut self) -> Result<()> {
         self.set_queue_index(
-            self.queue
-                .index
-                .map(|i| i + 1)
-                .filter(|i| *i < self.queue.tracks.len()),
+            self.queue.index.map(|i| i + 1).filter(|i| *i < self.queue.tracks.len()),
         )
     }
     /// Stops playback. This also unsets our position in the play queue.
@@ -219,10 +214,7 @@ impl Player {
 
 impl PlayQueue {
     pub fn new(tracks: Vec<Arc<Track>>) -> Self {
-        Self {
-            index: None,
-            tracks,
-        }
+        Self { index: None, tracks }
     }
 
     pub fn current(&self) -> Option<Arc<Track>> {
@@ -266,10 +258,7 @@ impl Source {
         .flat_map(|samples| samples.samples().iter().copied().collect_vec())
         .fuse();
 
-        Self {
-            reader,
-            iterator: Box::new(iterator),
-        }
+        Self { reader, iterator: Box::new(iterator) }
     }
 }
 

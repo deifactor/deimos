@@ -128,9 +128,7 @@ impl PlayerInterface for MprisAdapter {
     // position inside a track
 
     async fn seek(&self, time: mpris_server::Time) -> fdo::Result<()> {
-        self.tx
-            .send(Message::Command(Command::Seek(time.as_secs())))
-            .unwrap();
+        self.tx.send(Message::Command(Command::Seek(time.as_secs()))).unwrap();
         Ok(())
     }
     returns!(can_seek, bool, true);
