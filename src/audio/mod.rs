@@ -10,6 +10,7 @@ use cpal::{
 };
 use educe::Educe;
 use eyre::{eyre, Result};
+use fragile::Fragile;
 use itertools::Itertools;
 use log::error;
 use symphonia::core::audio::{AudioBuffer, SampleBuffer};
@@ -36,7 +37,10 @@ pub struct Player {
     queue: PlayQueue,
     /// Streams audio to the underlying OS audio library. We set this up on construction and never
     /// change it; instead, we just modify what `source` points to.
-    _stream: Stream,
+    ///
+    /// This is wrapped in [`Fragile`] so that other threads can read the player state; we don't
+    /// make this publicly readable anywhere.
+    _stream: Fragile<Stream>,
 }
 
 #[derive(Educe)]
@@ -96,7 +100,7 @@ impl Player {
             paused,
             timestamp: None,
             queue: PlayQueue::default(),
-            _stream: stream,
+            _stream: Fragile::new(stream),
         })
     }
 
@@ -169,11 +173,21 @@ impl Player {
         !self.paused() && self.current().is_some()
     }
 
+    pub fn stopped(&self) -> bool {
+        self.queue.index.is_none()
+    }
+
     pub fn paused(&self) -> bool {
         *self.paused.write().unwrap()
     }
 
-    pub fn set_paused(&mut self, paused: bool) {
+    pub fn pause(&mut self) {
+        if self.playing() {
+            self.set_paused(true);
+        }
+    }
+
+    fn set_paused(&mut self, paused: bool) {
         *self.paused.write().unwrap() = paused;
     }
 

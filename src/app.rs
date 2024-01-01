@@ -1,10 +1,11 @@
-use std::{io::Stdout, time::Duration};
+use std::{io::Stdout, sync::Arc, time::Duration};
 
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use enum_iterator::next_cycle;
 use eyre::Result;
 use itertools::Itertools;
 use log::debug;
+use mpris_server::Server;
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
@@ -13,7 +14,10 @@ use ratatui::{
 
 use tokio::{
     pin,
-    sync::mpsc::{unbounded_channel, UnboundedReceiver},
+    sync::{
+        mpsc::{unbounded_channel, UnboundedReceiver},
+        RwLock,
+    },
 };
 use tokio_stream::{wrappers::UnboundedReceiverStream, Stream, StreamExt};
 
@@ -21,6 +25,7 @@ use crate::{
     audio::{Player, PlayerMessage},
     library::Library,
     library_panel::{LibraryPanel, PanelItem},
+    mpris::MprisAdapter,
     ui::{
         artist_album_list::ArtistAlbumList, now_playing::NowPlaying, search::Search,
         spectrogram::Visualizer, Ui,
@@ -35,8 +40,9 @@ pub enum Panel {
 }
 
 pub struct App {
+    mpris: Option<MprisAdapter>,
     library: Library,
-    player: Player,
+    player: Arc<RwLock<Player>>,
     library_panel: LibraryPanel,
     visualizer: Visualizer,
     search: Search,
@@ -49,10 +55,15 @@ pub struct App {
 
 impl App {
     pub fn new(library: Library) -> Self {
-        let (_tx_message, rx_message) = unbounded_channel::<Message>();
+        let (tx_message, rx_message) = unbounded_channel::<Message>();
+
+        let player = Arc::new(RwLock::new(Player::new(tx_message.clone()).unwrap()));
+        let mpris = MprisAdapter::new(tx_message.clone(), Arc::clone(&player));
+
         Self {
+            mpris: Some(mpris),
             library,
-            player: Player::new(_tx_message).unwrap(),
+            player,
             library_panel: LibraryPanel::default(),
             visualizer: Visualizer::default(),
             search: Search::default(),
@@ -75,6 +86,8 @@ impl App {
 
         let mut event_stream = AppEvent::stream(terminal_events, self.rx_message.take().unwrap());
 
+        let _server = Server::new("deimos", self.mpris.take().unwrap()).await?;
+
         // draw once before we get an event
         terminal.draw(|f| self.draw(f).expect("failed to rerender app"))?;
         while let Some(event) = event_stream.next().await {
@@ -84,7 +97,7 @@ impl App {
             };
             if let Some(message) = message {
                 debug!("Received message {message:?}");
-                self.dispatch(message)?;
+                self.dispatch(message).await?;
             }
             terminal.draw(|f| self.draw(f).expect("failed to rerender app"))?;
             if self.should_quit {
@@ -96,15 +109,15 @@ impl App {
     }
 
     pub fn draw(&mut self, f: &mut Frame) -> Result<()> {
+        let player = self.player.blocking_read();
         let root = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Min(10), Constraint::Max(6)])
             .split(f.size());
         match self.active_panel {
-            Panel::Library => {
-                self.library_panel
-                    .draw(&self.ui, f, root[0], self.player.current())?
-            }
+            Panel::Library => self
+                .library_panel
+                .draw(&self.ui, f, root[0], player.current())?,
             Panel::Search => self.search.draw(&self.ui, f, root[0])?,
         }
         let bottom = Layout::default()
@@ -112,8 +125,8 @@ impl App {
             .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
             .split(root[1]);
         NowPlaying {
-            timestamp: self.player.timestamp(),
-            track: self.player.current(),
+            timestamp: player.timestamp(),
+            track: player.current(),
         }
         .draw(&self.ui, f, bottom[0])?;
         self.visualizer.draw(&self.ui, f, bottom[1])?;
@@ -171,6 +184,9 @@ pub enum Command {
     AddSongToQueue,
     /// Seeks to the previous song if near the beginning, or restarts the song if not.
     PreviousOrSeekToStart,
+    Play,
+    Pause,
+    Stop,
     PlayPause,
     NextTrack,
     Quit,
@@ -199,25 +215,25 @@ impl App {
         Some(message)
     }
 
-    fn dispatch(&mut self, message: Message) -> Result<()> {
+    async fn dispatch(&mut self, message: Message) -> Result<()> {
         use Message::*;
         match message {
             Command(command) => {
-                self.dispatch_command(command)?;
+                self.dispatch_command(command).await?;
             }
 
             Player(PlayerMessage::AudioFragment { buffer, timestamp }) => {
-                self.player.set_timestamp(Some(timestamp));
+                self.player.write().await.set_timestamp(Some(timestamp));
                 self.visualizer.update_spectrum(buffer)?;
             }
             Player(PlayerMessage::Finished) => {
-                self.dispatch_command(self::Command::NextTrack)?;
+                self.dispatch_command(self::Command::NextTrack).await?;
             }
         }
         Ok(())
     }
 
-    fn dispatch_command(&mut self, command: Command) -> Result<()> {
+    async fn dispatch_command(&mut self, command: Command) -> Result<()> {
         use Command::*;
         match command {
             Cancel => match self.active_panel {
@@ -239,7 +255,7 @@ impl App {
                 self.search.run_query(&self.library, query)?;
             }
             Activate => {
-                self.activate_item()?;
+                self.activate_item().await?;
             }
             Quit => self.should_quit = true,
             MoveCursor(motion) => {
@@ -258,7 +274,8 @@ impl App {
                 self.library_panel.focus = next_cycle(&self.library_panel.focus).unwrap();
             }
             Seek(seconds) => {
-                let Some(now) = self.player.timestamp() else {
+                let mut player = self.player.write().await;
+                let Some(now) = player.timestamp() else {
                     return Ok(());
                 };
                 let target = if seconds > 0 {
@@ -266,9 +283,9 @@ impl App {
                 } else {
                     now.saturating_sub(Duration::from_secs(seconds.unsigned_abs()))
                 };
-                if self.player.seek(target).is_err() {
+                if player.seek(target).is_err() {
                     // can happen when seeking off the end, etc
-                    self.player.next()?;
+                    player.next()?;
                 }
                 self.visualizer.reset()?;
             }
@@ -276,37 +293,41 @@ impl App {
                 let Some(selected) = self.library_panel.track_list.selected() else {
                     return Ok(());
                 };
-                self.player.queue_push(selected);
+                self.player.write().await.queue_push(selected);
             }
+            Play => self.player.write().await.play()?,
             PlayPause => {
-                if self.player.playing() {
-                    self.player.set_paused(true)
+                let mut player = self.player.write().await;
+                if player.playing() {
+                    player.pause();
                 } else {
-                    self.player.play()?;
+                    player.play()?;
                 }
             }
+            Pause => self.player.write().await.pause(),
+            Stop => self.player.write().await.stop(),
             PreviousOrSeekToStart => {
                 const MIN_DURATION_TO_SEEK: Duration = Duration::from_secs(5);
-                if self
-                    .player
+                let mut player = self.player.write().await;
+                if player
                     .timestamp()
                     .map_or(false, |dur| dur >= MIN_DURATION_TO_SEEK)
                 {
-                    self.player.seek(Duration::ZERO)?;
+                    player.seek(Duration::ZERO)?;
                 } else {
-                    self.player.previous()?;
+                    player.previous()?;
                 }
                 self.visualizer.reset()?;
             }
             NextTrack => {
-                self.player.next()?;
+                self.player.write().await.next()?;
                 self.visualizer.reset()?;
             }
         }
         Ok(())
     }
 
-    fn activate_item(&mut self) -> Result<()> {
+    async fn activate_item(&mut self) -> Result<()> {
         match self.active_panel {
             Panel::Library => match self.library_panel.focus {
                 PanelItem::ArtistAlbumList => {
@@ -318,9 +339,9 @@ impl App {
                     };
                     let tracks = self.library_panel.track_list.tracks().collect_vec();
                     let index = tracks.iter().find_position(|t| **t == selected).unwrap().0;
-                    self.player.set_play_queue(tracks);
-                    self.player.set_queue_index(Some(index))?;
-                    self.player.play()?;
+                    self.player.write().await.set_play_queue(tracks);
+                    self.player.write().await.set_queue_index(Some(index))?;
+                    self.player.write().await.play()?;
                     self.visualizer.reset()?;
                 }
             },

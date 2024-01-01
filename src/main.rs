@@ -2,6 +2,7 @@ mod app;
 mod audio;
 mod library;
 mod library_panel;
+mod mpris;
 mod ui;
 
 use std::{
