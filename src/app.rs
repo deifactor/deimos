@@ -9,6 +9,7 @@ use mpris_server::Server;
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
+    prelude::Backend,
     Frame, Terminal,
 };
 
@@ -88,8 +89,7 @@ impl App {
 
         let _server = Server::new("deimos", self.mpris.take().unwrap()).await?;
 
-        // draw once before we get an event
-        terminal.draw(|f| self.draw(f).expect("failed to rerender app"))?;
+        self.draw(terminal).await?;
         while let Some(event) = event_stream.next().await {
             let message = match event {
                 AppEvent::Terminal(terminal_event) => self.lookup_binding(terminal_event),
@@ -99,7 +99,7 @@ impl App {
                 debug!("Received message {message:?}");
                 self.dispatch(message).await?;
             }
-            terminal.draw(|f| self.draw(f).expect("failed to rerender app"))?;
+            self.draw(terminal).await?;
             if self.should_quit {
                 return Ok(());
             }
@@ -108,23 +108,29 @@ impl App {
         Ok(())
     }
 
-    pub fn draw(&mut self, f: &mut Frame) -> Result<()> {
-        let player = self.player.blocking_read();
-        let root = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Min(10), Constraint::Max(6)])
-            .split(f.size());
-        match self.active_panel {
-            Panel::Library => self.library_panel.draw(&self.ui, f, root[0], player.current())?,
-            Panel::Search => self.search.draw(&self.ui, f, root[0])?,
-        }
-        let bottom = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
-            .split(root[1]);
-        NowPlaying { timestamp: player.timestamp(), track: player.current() }
-            .draw(&self.ui, f, bottom[0])?;
-        self.visualizer.draw(&self.ui, f, bottom[1])?;
+    pub async fn draw<T: Backend>(&mut self, terminal: &mut Terminal<T>) -> Result<()> {
+        let player = self.player.read().await;
+        let mut cb = |f: &mut Frame| {
+            let root = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(10), Constraint::Max(6)])
+                .split(f.size());
+            match self.active_panel {
+                Panel::Library => {
+                    self.library_panel.draw(&self.ui, f, root[0], player.current())?
+                }
+                Panel::Search => self.search.draw(&self.ui, f, root[0])?,
+            }
+            let bottom = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+                .split(root[1]);
+            NowPlaying { timestamp: player.timestamp(), track: player.current() }
+                .draw(&self.ui, f, bottom[0])?;
+            self.visualizer.draw(&self.ui, f, bottom[1])?;
+            eyre::Ok(())
+        };
+        terminal.draw(|f| cb(f).expect("failed to render app"))?;
         Ok(())
     }
 
