@@ -25,7 +25,7 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 
 use tokio_stream::StreamExt;
 
-#[tokio::main(flavor = "multi_thread")]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     color_eyre::install()?;
     // when running with backtrace capture enabled, constructing the first error variant in a
