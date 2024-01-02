@@ -10,6 +10,7 @@ use tokio::sync::{mpsc::UnboundedSender, RwLock};
 use crate::{
     app::{Command, Message},
     audio::Player,
+    library::ArtistName,
 };
 
 /// Mediates between the `App` struct and the [`RootInterface`] and [`PlayerInterface`] that we
@@ -174,8 +175,22 @@ impl PlayerInterface for MprisAdapter {
             .current()
             .ok_or(fdo::Error::Failed("no current song".into()))?;
         let track_id: ObjectPath = format!("/{}", track.id).try_into().unwrap();
-        let metadata = mpris_server::Metadata::builder().trackid(track_id).build();
-        Ok(metadata)
+        let mut builder = mpris_server::Metadata::builder().trackid(track_id);
+        if let Some(title) = track.title.as_ref() {
+            builder = builder.title(title)
+        }
+        if let ArtistName::Artist(artist) = &track.artist {
+            builder = builder.artist(vec![artist.clone()]);
+        }
+        if let Some(album) = track.album.0.as_ref() {
+            builder = builder.album(album);
+        }
+        if let Some(track_number) = track.number {
+            builder = builder.track_number(track_number as i32);
+        }
+        let builder =
+            builder.length(mpris_server::Time::from_micros((track.length.0 * 1_000_000.0) as i64));
+        Ok(builder.build())
     }
 
     async fn open_uri(&self, _uri: String) -> fdo::Result<()> {
