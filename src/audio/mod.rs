@@ -1,8 +1,4 @@
-use std::{
-    iter,
-    sync::{Arc, Mutex, RwLock},
-    time::Duration,
-};
+use std::{iter, sync::Arc, time::Duration};
 
 use cpal::{
     traits::{DeviceTrait, HostTrait},
@@ -14,7 +10,7 @@ use fragile::Fragile;
 use itertools::Itertools;
 use log::error;
 use symphonia::core::audio::{AudioBuffer, SampleBuffer};
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::{mpsc::UnboundedSender, Mutex, RwLock};
 
 use crate::{app::Message, library::Track};
 
@@ -74,8 +70,8 @@ impl Player {
         let stream = device.build_output_stream(
             &config,
             move |data: &mut [f32], _| {
-                match source_clone.lock().unwrap().as_mut() {
-                    Some(iter) if !*paused_clone.read().unwrap() => {
+                match source_clone.blocking_lock().as_mut() {
+                    Some(iter) if !*paused_clone.blocking_read() => {
                         // copy from src to dst, zeroing the rest
                         for (dst, src) in
                             data.iter_mut().zip(iter.chain(iter::repeat(f32::EQUILIBRIUM)))
@@ -116,8 +112,8 @@ impl Player {
     }
 
     /// Sets the play queue to the given playlist. Also stops existing playback.
-    pub fn set_play_queue(&mut self, tracks: Vec<Arc<Track>>) {
-        self.stop();
+    pub async fn set_play_queue(&mut self, tracks: Vec<Arc<Track>>) {
+        self.stop().await;
         self.queue = PlayQueue::new(tracks);
     }
 
@@ -126,10 +122,10 @@ impl Player {
     }
 
     /// Sets the current track to the one at the given position. Panics if that's out of bounds.
-    pub fn set_queue_index(&mut self, index: Option<usize>) -> Result<()> {
+    pub async fn set_queue_index(&mut self, index: Option<usize>) -> Result<()> {
         self.queue.index = index;
         let Some(track) = self.queue.current() else {
-            self.stop();
+            self.stop().await;
             return Ok(());
         };
 
@@ -146,66 +142,67 @@ impl Player {
             let _ = tx_message.send(Message::Player(PlayerMessage::Finished));
         });
         let source = Source::new(reader, on_decode, on_finish);
-        *self.source.lock().unwrap() = Some(source);
+        *self.source.lock().await = Some(source);
         Ok(())
     }
 }
 
 /// Functions related to playback control.
 impl Player {
-    pub fn previous(&mut self) -> Result<()> {
-        self.set_queue_index(self.queue.index.and_then(|i| i.checked_sub(1)))
+    pub async fn previous(&mut self) -> Result<()> {
+        self.set_queue_index(self.queue.index.and_then(|i| i.checked_sub(1))).await
     }
 
     /// Unpauses. If there is no selected track, selects the first track.
-    pub fn play(&mut self) -> Result<()> {
+    pub async fn play(&mut self) -> Result<()> {
         if self.queue.current().is_none() && !self.queue.tracks.is_empty() {
-            self.set_queue_index(Some(0))?;
+            self.set_queue_index(Some(0)).await?;
         }
-        self.set_paused(false);
+        self.set_paused(false).await;
         Ok(())
     }
 
     /// True if audio is being produced (i.e., we're not paused *and* there's a current song).
-    pub fn playing(&self) -> bool {
-        !self.paused() && self.current().is_some()
+    pub async fn playing(&self) -> bool {
+        !self.paused().await && self.current().is_some()
     }
 
     pub fn stopped(&self) -> bool {
         self.queue.index.is_none()
     }
 
-    pub fn paused(&self) -> bool {
-        *self.paused.write().unwrap()
+    pub async fn paused(&self) -> bool {
+        *self.paused.write().await
     }
 
-    pub fn pause(&mut self) {
-        if self.playing() {
-            self.set_paused(true);
+    pub async fn pause(&mut self) {
+        if self.playing().await {
+            self.set_paused(true).await;
         }
     }
 
-    fn set_paused(&mut self, paused: bool) {
-        *self.paused.write().unwrap() = paused;
+    async fn set_paused(&mut self, paused: bool) {
+        *self.paused.write().await = paused;
     }
 
     /// Moves to the next track. If this was the last track, equivalent to stop().
-    pub fn next(&mut self) -> Result<()> {
+    pub async fn next(&mut self) -> Result<()> {
         self.set_queue_index(
             self.queue.index.map(|i| i + 1).filter(|i| *i < self.queue.tracks.len()),
         )
+        .await
     }
     /// Stops playback. This also unsets our position in the play queue.
-    pub fn stop(&mut self) {
+    pub async fn stop(&mut self) {
         self.queue.index = None;
-        *self.source.lock().unwrap() = None;
+        *self.source.lock().await = None;
     }
 
     /// Seek to the given timestamp. Does nothing if there's no currently-playing track.
-    pub fn seek(&mut self, target: Duration) -> Result<()> {
-        let mut source = self.source.lock().unwrap();
+    pub async fn seek(&mut self, target: Duration) -> Result<()> {
+        let mut source = self.source.lock().await;
         if let Some(source) = source.as_mut() {
-            source.reader.lock().unwrap().seek(target)
+            source.reader.lock().await.seek(target)
         } else {
             Ok(())
         }
@@ -241,7 +238,7 @@ impl Source {
         let reader_clone = Arc::clone(&reader);
         let mut on_finish = Some(on_finish);
         let iterator = iter::from_fn(move || {
-            let samples = reader_clone.lock().unwrap().next().map(|fragment| {
+            let samples = reader_clone.blocking_lock().next().map(|fragment| {
                 let buffer = &fragment.buffer;
                 let mut samples = SampleBuffer::new(buffer.capacity() as u64, *buffer.spec());
                 samples.copy_interleaved_typed(buffer);

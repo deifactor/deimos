@@ -278,9 +278,9 @@ impl App {
                 } else {
                     now.saturating_sub(Duration::from_secs(seconds.unsigned_abs()))
                 };
-                if player.seek(target).is_err() {
+                if player.seek(target).await.is_err() {
                     // can happen when seeking off the end, etc
-                    player.next()?;
+                    player.next().await?;
                 }
                 self.visualizer.reset()?;
             }
@@ -290,29 +290,29 @@ impl App {
                 };
                 self.player.write().await.queue_push(selected);
             }
-            Play => self.player.write().await.play()?,
+            Play => self.player.write().await.play().await?,
             PlayPause => {
                 let mut player = self.player.write().await;
-                if player.playing() {
-                    player.pause();
+                if player.playing().await {
+                    player.pause().await;
                 } else {
-                    player.play()?;
+                    player.play().await?;
                 }
             }
-            Pause => self.player.write().await.pause(),
-            Stop => self.player.write().await.stop(),
+            Pause => self.player.write().await.pause().await,
+            Stop => self.player.write().await.stop().await,
             PreviousOrSeekToStart => {
                 const MIN_DURATION_TO_SEEK: Duration = Duration::from_secs(5);
                 let mut player = self.player.write().await;
                 if player.timestamp().map_or(false, |dur| dur >= MIN_DURATION_TO_SEEK) {
-                    player.seek(Duration::ZERO)?;
+                    player.seek(Duration::ZERO).await?;
                 } else {
-                    player.previous()?;
+                    player.previous().await?;
                 }
                 self.visualizer.reset()?;
             }
             NextTrack => {
-                self.player.write().await.next()?;
+                self.player.write().await.next().await?;
                 self.visualizer.reset()?;
             }
         }
@@ -331,9 +331,10 @@ impl App {
                     };
                     let tracks = self.library_panel.track_list.tracks().collect_vec();
                     let index = tracks.iter().find_position(|t| **t == selected).unwrap().0;
-                    self.player.write().await.set_play_queue(tracks);
-                    self.player.write().await.set_queue_index(Some(index))?;
-                    self.player.write().await.play()?;
+                    let mut player = self.player.write().await;
+                    player.set_play_queue(tracks).await;
+                    player.set_queue_index(Some(index)).await?;
+                    player.play().await?;
                     self.visualizer.reset()?;
                 }
             },

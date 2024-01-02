@@ -102,7 +102,7 @@ impl PlayerInterface for MprisAdapter {
         let player = self.player.read().await;
         Ok(if player.stopped() {
             PlaybackStatus::Stopped
-        } else if player.playing() {
+        } else if player.playing().await {
             PlaybackStatus::Playing
         } else {
             PlaybackStatus::Paused
@@ -167,7 +167,13 @@ impl PlayerInterface for MprisAdapter {
     }
 
     async fn metadata(&self) -> fdo::Result<mpris_server::Metadata> {
-        let track_id: ObjectPath = "/1234".try_into().unwrap();
+        let track = self
+            .player
+            .read()
+            .await
+            .current()
+            .ok_or(fdo::Error::Failed("no current song".into()))?;
+        let track_id: ObjectPath = format!("/{}", track.id).try_into().unwrap();
         let metadata = mpris_server::Metadata::builder().trackid(track_id).build();
         Ok(metadata)
     }

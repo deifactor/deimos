@@ -59,6 +59,8 @@ impl Album {
 
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
 pub struct Track {
+    /// Arbitrary numeric ID used for MPRIS purposes.
+    pub id: u64,
     pub number: Option<u32>,
     pub path: PathBuf,
     pub title: Option<String>,
@@ -88,14 +90,16 @@ impl Library {
     /// Scan the given path for music, initializing it as we go.
     pub fn scan(path: impl AsRef<Path>) -> Result<Self> {
         let mut library = Self::default();
+        let mut id = 0;
 
         for entry in WalkDir::new(path)
             .into_iter()
             .filter_map(|e| e.ok())
             .filter(|e| e.file_type().is_file())
         {
-            if let Ok(track) = Track::from_path(entry.path()) {
+            if let Ok(track) = Track::from_path(entry.path(), id) {
                 library.insert_track(track)?;
+                id += 1;
             }
         }
         Ok(library)
@@ -136,7 +140,7 @@ impl Library {
 }
 
 impl Track {
-    pub fn from_path(path: &Path) -> Result<Self> {
+    pub fn from_path(path: &Path, id: u64) -> Result<Self> {
         let probe = symphonia::default::get_probe();
 
         let file = File::open(path)?;
@@ -159,6 +163,7 @@ impl Track {
         let duration = duration.seconds as f64 + duration.frac;
 
         Ok(Self {
+            id,
             number: tag.track(),
             path: path.to_owned(),
             title: tag.title().map(normalize),
