@@ -1,10 +1,9 @@
+use std::f32::consts::PI;
+
 use eyre::{anyhow, eyre, Result};
 use itertools::Itertools;
 use ratatui::widgets::Sparkline;
-use spectrum_analyzer::{
-    samples_fft_to_spectrum, scaling::divide_by_N_sqrt, windows::hann_window, FrequencyLimit,
-    FrequencySpectrum,
-};
+use spectrum_analyzer::{samples_fft_to_spectrum, FrequencyLimit, FrequencySpectrum};
 
 use symphonia::core::audio::{AudioBuffer, Signal};
 
@@ -36,6 +35,8 @@ pub struct Visualizer {
     /// The FFT of `buffer`, padded if necessary.
     spectrum: FrequencySpectrum,
     amplitudes: Option<Vec<f32>>,
+    /// Precomputed coefficients for Hann windowing.
+    hann_coefficients: Vec<f32>,
 }
 
 impl Default for Visualizer {
@@ -47,26 +48,31 @@ impl Default for Visualizer {
 impl Visualizer {
     pub fn new(options: VisualizerOptions) -> Result<Self> {
         let buffer = vec![0.0; options.window_length];
-        let spectrum = samples_fft_to_spectrum(
-            &hann_window(&buffer),
-            44100,
-            FrequencyLimit::All,
-            Some(&divide_by_N_sqrt),
-        )
-        .map_err(|e| anyhow!("{:?}", e))?;
-        Ok(Self { buffer: vec![0.0; options.window_length], options, spectrum, amplitudes: None })
+        // no scaling necessary for zeroes
+        let spectrum = samples_fft_to_spectrum(&buffer, 44100, FrequencyLimit::All, None)
+            .map_err(|e| anyhow!("{:?}", e))?;
+        let len = options.window_length as f32;
+        let hann_coefficients = (0..options.window_length)
+            .map(|i| {
+                let x = (2.0 * PI * (i as f32) / len).cos();
+                0.5 * (1.0 - x)
+            })
+            .collect_vec();
+        Ok(Self {
+            buffer: vec![0.0; options.window_length],
+            options,
+            spectrum,
+            amplitudes: None,
+            hann_coefficients,
+        })
     }
 
     /// Resets the visualizer's state as if freshly-created.
     pub fn reset(&mut self) -> Result<()> {
         self.buffer.fill(0.0);
-        self.spectrum = samples_fft_to_spectrum(
-            &hann_window(&self.buffer),
-            44100,
-            FrequencyLimit::All,
-            Some(&divide_by_N_sqrt),
-        )
-        .map_err(|e| eyre!("couldn't FFT: {:?}", e))?;
+        // no scaling necessary for zeroes
+        self.spectrum = samples_fft_to_spectrum(&self.buffer, 44100, FrequencyLimit::All, None)
+            .map_err(|e| eyre!("couldn't FFT: {:?}", e))?;
         self.amplitudes = None;
         Ok(())
     }
@@ -87,13 +93,11 @@ impl Visualizer {
         // if we have enough samples, take the last window_length and FFT
         self.buffer = self.buffer.split_off(self.buffer.len() - self.options.window_length);
 
-        self.spectrum = samples_fft_to_spectrum(
-            &hann_window(&self.buffer),
-            44100,
-            FrequencyLimit::All,
-            Some(&divide_by_N_sqrt),
-        )
-        .map_err(|e| anyhow!("{:?}", e))?;
+        // using the scaling function argument computes statistics twice (since the scaling function
+        // can use the statistics).
+        let samples = self.window_and_scale(&self.buffer);
+        self.spectrum = samples_fft_to_spectrum(&samples, 44100, FrequencyLimit::All, None)
+            .map_err(|e| anyhow!("{:?}", e))?;
         Ok(())
     }
 
@@ -144,5 +148,15 @@ impl Visualizer {
         let sparkline = Sparkline::default().data(&u64_amplitudes).max(64);
         frame.render_widget(sparkline, area);
         Ok(())
+    }
+
+    /// Applies (Hann) windowing to samples and scales by sqrt(N).
+    fn window_and_scale(&self, samples: &[f32]) -> Vec<f32> {
+        let sqrt_n = (samples.len() as f32).sqrt();
+        samples
+            .iter()
+            .zip(self.hann_coefficients.iter())
+            .map(|(sample, coeff)| sample * coeff / sqrt_n)
+            .collect_vec()
     }
 }
