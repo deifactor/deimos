@@ -21,6 +21,7 @@
             toolchain
             cargo-nextest
             cargo-outdated
+            cargo-flamegraph
 
             pkg-config
             alsa-lib
