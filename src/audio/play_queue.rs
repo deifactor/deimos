@@ -9,16 +9,20 @@ pub struct PlayQueue {
     index: Option<usize>,
     tracks: Vec<Arc<Track>>,
     loop_status: LoopStatus,
+    shuffled: bool,
+    original_order: Vec<Arc<Track>>,
 }
 
 impl PlayQueue {
     pub fn new(tracks: Vec<Arc<Track>>) -> Self {
-        Self { index: None, tracks, loop_status: LoopStatus::None }
+        let original_order = tracks.clone();
+        Self { index: None, tracks, loop_status: LoopStatus::None, shuffled: false, original_order }
     }
 
     /// Sets the tracks to the given list. Also clears the currently playing track, since in
     /// general there's nothing sensible to do there.
     pub fn set_tracks(&mut self, tracks: Vec<Arc<Track>>) {
+        self.original_order = tracks.clone();
         self.tracks = tracks;
         self.index = None;
     }
@@ -41,6 +45,38 @@ impl PlayQueue {
 
     pub fn set_loop_status(&mut self, loop_status: LoopStatus) {
         self.loop_status = loop_status;
+    }
+
+    pub fn shuffle(&self) -> bool {
+        self.shuffled
+    }
+
+    pub fn set_shuffle(&mut self, shuffle: bool) {
+        if shuffle == self.shuffle() {
+            return;
+        }
+        self.shuffled = shuffle;
+        let current_track = self.current_track();
+        if shuffle {
+            fastrand::shuffle(&mut self.tracks);
+        } else {
+            self.tracks = self.original_order.clone();
+        }
+        let Some(current_track) = current_track else {
+            return;
+        };
+        let new_index = self
+            .tracks
+            .iter()
+            .position(|track| track.id == current_track.id)
+            .expect("couldn't find track after shuffling");
+        // If we just shuffled, we need to move the current track to the front.
+        if shuffle {
+            self.tracks.swap(0, new_index);
+            self.index = Some(0);
+        } else {
+            self.index = Some(new_index);
+        }
     }
 
     pub fn current_track(&self) -> Option<Arc<Track>> {
@@ -72,6 +108,7 @@ impl PlayQueue {
     }
 
     pub fn push(&mut self, track: Arc<Track>) {
+        self.original_order.push(Arc::clone(&track));
         self.tracks.push(track);
     }
 }
@@ -131,5 +168,63 @@ mod tests {
             queue.current(),
             "next track should be the same with track looping"
         );
+    }
+
+    // Longer queue used for shuffle-related tests.
+    fn shuffle_test_queue() -> PlayQueue {
+        let mut queue = PlayQueue::default();
+        for i in 0..50 {
+            queue.push(Arc::new(Track::test_track(i)));
+        }
+        queue
+    }
+
+    #[test]
+    fn first_after_shuffle() {
+        for _ in 0..10 {
+            let mut queue = shuffle_test_queue();
+            queue.set_current(Some(20));
+            let track = queue.current_track();
+            queue.set_shuffle(true);
+            assert_eq!(
+                queue.current_track(),
+                track,
+                "shuffling the queue should leave the track the same"
+            );
+            assert_eq!(
+                queue.current(),
+                Some(0),
+                "shuffling the queue should move the current track to the front"
+            );
+        }
+    }
+
+    #[test]
+    fn shuffle_unshuffle() {
+        for _ in 0..10 {
+            let mut queue = shuffle_test_queue();
+            let original = queue.tracks.clone();
+            queue.set_shuffle(true);
+            queue.set_shuffle(false);
+            assert_eq!(queue.tracks, original);
+        }
+    }
+
+    #[test]
+    fn order_after_unshuffle() {
+        for _ in 0..10 {
+            let mut queue = shuffle_test_queue();
+            queue.set_shuffle(true);
+            queue.set_current(Some(20));
+            let track = queue.current_track();
+            dbg!(&queue);
+            queue.set_shuffle(false);
+            dbg!(&queue);
+            assert_eq!(
+                queue.current_track(),
+                track,
+                "unshuffling the queue should leave the track the same"
+            );
+        }
     }
 }

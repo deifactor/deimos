@@ -123,11 +123,12 @@ impl PlayerInterface for MprisAdapter {
     }
 
     async fn shuffle(&self) -> fdo::Result<bool> {
-        Ok(false)
+        Ok(self.player.read().await.queue().shuffle())
     }
 
-    async fn set_shuffle(&self, _shuffle: bool) -> zbus::Result<()> {
-        todo!()
+    async fn set_shuffle(&self, shuffle: bool) -> zbus::Result<()> {
+        self.send_command(Command::SetShuffle(shuffle))?;
+        Ok(())
     }
 
     // position inside a track

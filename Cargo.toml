@@ -15,6 +15,7 @@ educe = { version = "0.4.23", default-features = false, features = ["Debug"] }
 enum-iterator = "1.4.1"
 env_logger = "0.10.0"
 eyre = "0.6.11"
+fastrand = "2.0.1"
 fragile = "2.0.0"
 itertools = "0.12.0"
 lofty = "0.17.0"

@@ -214,6 +214,10 @@ impl Player {
     pub fn set_loop_status(&mut self, loop_status: LoopStatus) {
         self.queue.set_loop_status(loop_status)
     }
+
+    pub fn set_shuffle(&mut self, shuffle: bool) {
+        self.queue.set_shuffle(shuffle)
+    }
 }
 
 type DecodeCallback = Box<dyn FnMut(Fragment) + Send + 'static>;

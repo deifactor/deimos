@@ -183,6 +183,7 @@ pub enum Command {
         mpris_id: TrackId,
     },
     SetLoopStatus(LoopStatus),
+    SetShuffle(bool),
     /// Adds the currently selected song to the play queue.
     AddSongToQueue,
     /// Seeks to the previous song if near the beginning, or restarts the song if not.
@@ -304,6 +305,9 @@ impl App {
             }
             SetLoopStatus(loop_status) => {
                 self.player.write().await.set_loop_status(loop_status);
+            }
+            SetShuffle(shuffle) => {
+                self.player.write().await.set_shuffle(shuffle);
             }
             AddSongToQueue => {
                 let Some(selected) = self.library_panel.track_list.selected() else {

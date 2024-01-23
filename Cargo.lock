@@ -589,6 +589,7 @@ dependencies = [
  "enum-iterator",
  "env_logger",
  "eyre",
+ "fastrand 2.0.1",
  "fragile",
  "itertools",
  "lofty",
