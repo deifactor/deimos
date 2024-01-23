@@ -1,8 +1,8 @@
-use std::{future::Future, pin::Pin, sync::Arc};
+use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
 
 use mpris_server::{
     async_trait,
-    zbus::{self, fdo, zvariant::ObjectPath},
+    zbus::{self, fdo},
     LoopStatus, PlaybackStatus, PlayerInterface, RootInterface, TrackId,
 };
 use tokio::sync::{mpsc::UnboundedSender, RwLock};
@@ -144,8 +144,12 @@ impl PlayerInterface for MprisAdapter {
         Ok(mpris_server::Time::from_micros(timestamp.as_micros() as i64))
     }
 
-    async fn set_position(&self, _track_id: TrackId, _time: mpris_server::Time) -> fdo::Result<()> {
-        todo!()
+    async fn set_position(&self, track_id: TrackId, time: mpris_server::Time) -> fdo::Result<()> {
+        let position = Duration::from_micros(time.as_micros() as u64);
+        self.tx
+            .send(Message::Command(Command::SetPositionIfTrack { position, mpris_id: track_id }))
+            .map_err(|e| fdo::Error::Failed(format!("couldn't send message: {}", e)))?;
+        Ok(())
     }
 
     // rate
@@ -174,8 +178,7 @@ impl PlayerInterface for MprisAdapter {
             .await
             .current()
             .ok_or(fdo::Error::Failed("no current song".into()))?;
-        let track_id: ObjectPath = format!("/{}", track.id).try_into().unwrap();
-        let mut builder = mpris_server::Metadata::builder().trackid(track_id);
+        let mut builder = mpris_server::Metadata::builder().trackid(track.mpris_id());
         if let Some(title) = track.title.as_ref() {
             builder = builder.title(title)
         }

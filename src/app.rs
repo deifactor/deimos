@@ -5,7 +5,7 @@ use enum_iterator::next_cycle;
 use eyre::Result;
 use itertools::Itertools;
 use log::debug;
-use mpris_server::Server;
+use mpris_server::{Server, TrackId};
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
@@ -176,6 +176,12 @@ pub enum Command {
     SearchBackspace,
     /// Seeks the current song by the given amount.
     Seek(i64),
+    /// If the current track has the given track ID, sets the position accordingly. This is used
+    /// by the mpris server, where the track ID is present to avoid race conditions.
+    SetPositionIfTrack {
+        position: Duration,
+        mpris_id: TrackId,
+    },
     /// Adds the currently selected song to the play queue.
     AddSongToQueue,
     /// Seeks to the previous song if near the beginning, or restarts the song if not.
@@ -279,6 +285,17 @@ impl App {
                     now.saturating_sub(Duration::from_secs(seconds.unsigned_abs()))
                 };
                 if player.seek(target).await.is_err() {
+                    // can happen when seeking off the end, etc
+                    player.next().await?;
+                }
+                self.visualizer.reset()?;
+            }
+            SetPositionIfTrack { position, mpris_id } => {
+                let mut player = self.player.write().await;
+                if player.current().map(|t| t.mpris_id()) != Some(mpris_id) {
+                    return Ok(());
+                }
+                if player.seek(position).await.is_err() {
                     // can happen when seeking off the end, etc
                     player.next().await?;
                 }

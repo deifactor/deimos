@@ -1,6 +1,7 @@
 use eyre::{eyre, Result};
 use itertools::Itertools;
 use lofty::{Accessor, ItemKey, TaggedFileExt};
+use mpris_server::TrackId;
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -67,6 +68,12 @@ pub struct Track {
     pub album: AlbumName,
     pub artist: ArtistName,
     pub length: OrderedFloat<f64>,
+}
+
+impl Track {
+    pub fn mpris_id(&self) -> TrackId {
+        format!("/{}", self.id).try_into().expect("failed to convert track id to dbus object")
+    }
 }
 
 impl Library {
