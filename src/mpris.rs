@@ -24,13 +24,21 @@ impl MprisAdapter {
     pub fn new(tx: UnboundedSender<Message>, player: Arc<RwLock<Player>>) -> Self {
         Self { tx, player }
     }
+
+    /// Sends a command to the main task. This should never fail, but in case it does we return an
+    /// err rather than dying.
+    fn send_command(&self, command: Command) -> fdo::Result<()> {
+        self.tx
+            .send(Message::Command(command))
+            .map_err(|e| fdo::Error::Failed(format!("failed to send command to main task: {e}")))
+    }
 }
 
 // These two have to use the "manually-expanded" variant of async_trait's functions because
 // async_trait's macro processing happens *before* inner macros expand.
 
 /// Declares a method that sends `Command::$command`.
-macro_rules! send_command {
+macro_rules! sends_command {
     ($method:ident, $command:ident) => {
         fn $method<'life, 'async_>(
             &'life self,
@@ -39,10 +47,7 @@ macro_rules! send_command {
             'life: 'async_,
             Self: Sync + 'async_,
         {
-            Box::pin(async move {
-                self.tx.send(Message::Command(Command::$command)).unwrap();
-                Ok(())
-            })
+            Box::pin(async move { self.send_command(Command::$command) })
         }
     };
 }
@@ -62,8 +67,6 @@ macro_rules! returns {
     };
 }
 
-/// TODO: replace all unwraps here with error mapping
-
 #[async_trait]
 impl RootInterface for MprisAdapter {
     returns!(identity, String, "deimos".into());
@@ -76,7 +79,7 @@ impl RootInterface for MprisAdapter {
     returns!(fullscreen, bool, false);
     returns!(can_set_fullscreen, bool, false);
     returns!(has_track_list, bool, false);
-    send_command!(quit, Quit);
+    sends_command!(quit, Quit);
 
     async fn set_fullscreen(&self, _fullscreen: bool) -> zbus::Result<()> {
         Ok(())
@@ -86,12 +89,12 @@ impl RootInterface for MprisAdapter {
 #[async_trait]
 impl PlayerInterface for MprisAdapter {
     // 'traditional' player controls
-    send_command!(next, NextTrack);
-    send_command!(previous, PreviousOrSeekToStart);
-    send_command!(stop, Stop);
-    send_command!(play, Play);
-    send_command!(play_pause, PlayPause);
-    send_command!(pause, Pause);
+    sends_command!(next, NextTrack);
+    sends_command!(previous, PreviousOrSeekToStart);
+    sends_command!(stop, Stop);
+    sends_command!(play, Play);
+    sends_command!(play_pause, PlayPause);
+    sends_command!(pause, Pause);
 
     returns!(can_play, bool, true);
     returns!(can_pause, bool, true);
@@ -129,8 +132,7 @@ impl PlayerInterface for MprisAdapter {
     // position inside a track
 
     async fn seek(&self, time: mpris_server::Time) -> fdo::Result<()> {
-        self.tx.send(Message::Command(Command::Seek(time.as_secs()))).unwrap();
-        Ok(())
+        self.send_command(Command::Seek(time.as_secs()))
     }
     returns!(can_seek, bool, true);
 
@@ -146,10 +148,7 @@ impl PlayerInterface for MprisAdapter {
 
     async fn set_position(&self, track_id: TrackId, time: mpris_server::Time) -> fdo::Result<()> {
         let position = Duration::from_micros(time.as_micros() as u64);
-        self.tx
-            .send(Message::Command(Command::SetPositionIfTrack { position, mpris_id: track_id }))
-            .map_err(|e| fdo::Error::Failed(format!("couldn't send message: {}", e)))?;
-        Ok(())
+        self.send_command(Command::SetPositionIfTrack { position, mpris_id: track_id })
     }
 
     // rate
