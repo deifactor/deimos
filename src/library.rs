@@ -74,6 +74,21 @@ impl Track {
     pub fn mpris_id(&self) -> TrackId {
         format!("/{}", self.id).try_into().expect("failed to convert track id to dbus object")
     }
+
+    #[cfg(test)]
+    /// A test track with all of the fields set. `test_track(i) ==
+    /// test_track(j)` iff `i == j`, but don't rely on any specific properties.
+    pub fn test_track(id: u64) -> Track {
+        Track {
+            id,
+            number: Some(id as u32),
+            path: PathBuf::from(format!("/{id}.mp3")),
+            title: Some(format!("Test track {id}")),
+            album: AlbumName(Some("Test album".into())),
+            artist: ArtistName::Artist("Test artist".into()),
+            length: OrderedFloat(200.0),
+        }
+    }
 }
 
 impl Library {
@@ -220,4 +235,20 @@ fn normalize(s: impl AsRef<str>) -> String {
         ('\u{201d}', '"'),
     ]);
     s.as_ref().chars().map(|c| normalize_map.get(&c).copied().unwrap_or(c)).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn equal_test_track_ids_are_equal() {
+        assert_eq!(Track::test_track(0), Track::test_track(0));
+        assert_eq!(Track::test_track(1), Track::test_track(1));
+    }
+
+    #[test]
+    fn unequal_test_track_ids_are_unequal() {
+        assert_ne!(Track::test_track(0), Track::test_track(1));
+    }
 }

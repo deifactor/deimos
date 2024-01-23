@@ -49,3 +49,38 @@ impl Default for PlayQueue {
         Self::new(vec![])
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_queue() -> PlayQueue {
+        PlayQueue::new(vec![
+            Arc::new(Track::test_track(0)),
+            Arc::new(Track::test_track(1)),
+            Arc::new(Track::test_track(2)),
+        ])
+    }
+
+    #[test]
+    fn test_next() {
+        let mut queue = sample_queue();
+        queue.set_current(None);
+        assert_eq!(queue.next(), None, "next() on a stopped queue should return None");
+        queue.set_current(Some(1));
+        assert_eq!(queue.next(), Some(2));
+        queue.set_current(Some(2));
+        assert_eq!(queue.next(), None, "next() on the last track should return None");
+    }
+
+    #[test]
+    fn test_previous() {
+        let mut queue = sample_queue();
+        queue.set_current(None);
+        assert_eq!(queue.previous(), None, "previous() on a stopped queue should return None");
+        queue.set_current(Some(1));
+        assert_eq!(queue.previous(), Some(0));
+        queue.set_current(Some(2));
+        assert_eq!(queue.previous(), Some(1));
+    }
+}
