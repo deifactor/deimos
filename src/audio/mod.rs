@@ -14,8 +14,12 @@ use tokio::sync::{mpsc::UnboundedSender, Mutex, RwLock};
 
 use crate::{app::Message, library::Track};
 
-use self::reader::{Fragment, SymphoniaReader};
+use self::{
+    play_queue::PlayQueue,
+    reader::{Fragment, SymphoniaReader},
+};
 
+mod play_queue;
 mod reader;
 
 pub struct Player {
@@ -48,12 +52,6 @@ pub enum PlayerMessage {
         timestamp: Duration,
     },
     Finished,
-}
-
-#[derive(Debug, Default)]
-struct PlayQueue {
-    index: Option<usize>,
-    tracks: Vec<Arc<Track>>,
 }
 
 impl Player {
@@ -100,7 +98,7 @@ impl Player {
 
     /// The currently-playing track.
     pub fn current(&self) -> Option<Arc<Track>> {
-        self.queue.current()
+        self.queue.current_track()
     }
 
     pub fn timestamp(&self) -> Option<Duration> {
@@ -118,17 +116,19 @@ impl Player {
     }
 
     pub fn queue_push(&mut self, track: Arc<Track>) {
-        self.queue.tracks.push(track);
+        self.queue.push(track);
     }
 
     /// Sets the current track to the one at the given position. Panics if that's out of bounds.
     pub async fn set_queue_index(&mut self, index: Option<usize>) -> Result<()> {
-        self.queue.index = index;
-        let Some(track) = self.queue.current() else {
+        if index.is_none() {
             self.stop().await;
             return Ok(());
-        };
+        }
 
+        self.queue.set_current(index);
+        let track =
+            self.queue.current_track().expect("set current index to non-None, but no track");
         let reader = Arc::new(Mutex::new(SymphoniaReader::from_path(&track.path)?));
         let tx_message = self.tx_message.clone();
         let on_decode: DecodeCallback = Box::new(move |fragment| {
@@ -150,12 +150,12 @@ impl Player {
 /// Functions related to playback control.
 impl Player {
     pub async fn previous(&mut self) -> Result<()> {
-        self.set_queue_index(self.queue.index.and_then(|i| i.checked_sub(1))).await
+        self.set_queue_index(self.queue.previous()).await
     }
 
     /// Unpauses. If there is no selected track, selects the first track.
     pub async fn play(&mut self) -> Result<()> {
-        if self.queue.current().is_none() && !self.queue.tracks.is_empty() {
+        if self.queue.current_track().is_none() && !self.queue.is_empty() {
             self.set_queue_index(Some(0)).await?;
         }
         self.set_paused(false).await;
@@ -168,7 +168,7 @@ impl Player {
     }
 
     pub fn stopped(&self) -> bool {
-        self.queue.index.is_none()
+        self.queue.current().is_none()
     }
 
     pub async fn paused(&self) -> bool {
@@ -187,14 +187,12 @@ impl Player {
 
     /// Moves to the next track. If this was the last track, equivalent to stop().
     pub async fn next(&mut self) -> Result<()> {
-        self.set_queue_index(
-            self.queue.index.map(|i| i + 1).filter(|i| *i < self.queue.tracks.len()),
-        )
-        .await
+        self.set_queue_index(self.queue.next()).await
     }
+
     /// Stops playback. This also unsets our position in the play queue.
     pub async fn stop(&mut self) {
-        self.queue.index = None;
+        self.queue.set_current(None);
         *self.source.lock().await = None;
     }
 
@@ -206,16 +204,6 @@ impl Player {
         } else {
             Ok(())
         }
-    }
-}
-
-impl PlayQueue {
-    pub fn new(tracks: Vec<Arc<Track>>) -> Self {
-        Self { index: None, tracks }
-    }
-
-    pub fn current(&self) -> Option<Arc<Track>> {
-        self.index.map(|i| Arc::clone(&self.tracks[i]))
     }
 }
 
