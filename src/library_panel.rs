@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use enum_iterator::Sequence;
 use eyre::Result;
 use itertools::Itertools;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
@@ -15,11 +14,20 @@ use crate::{
     },
 };
 
-#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, Sequence)]
+#[derive(Debug, Copy, Clone, Default, PartialEq, Eq)]
 pub enum PanelItem {
     #[default]
     ArtistAlbumList,
     TrackList,
+}
+
+impl PanelItem {
+    pub fn next(self) -> PanelItem {
+        match self {
+            PanelItem::ArtistAlbumList => PanelItem::TrackList,
+            PanelItem::TrackList => PanelItem::ArtistAlbumList,
+        }
+    }
 }
 
 #[derive(Debug, Default)]

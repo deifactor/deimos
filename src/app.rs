@@ -1,7 +1,6 @@
 use std::{io::Stdout, sync::Arc, time::Duration};
 
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
-use enum_iterator::next_cycle;
 use eyre::Result;
 use itertools::Itertools;
 use log::debug;
@@ -273,9 +272,7 @@ impl App {
                     Panel::Search => self.search.move_cursor(delta),
                 }
             }
-            NextFocus => {
-                self.library_panel.focus = next_cycle(&self.library_panel.focus).unwrap();
-            }
+            NextFocus => self.library_panel.focus = self.library_panel.focus.next(),
             Seek(seconds) => {
                 let mut player = self.player.write().await;
                 let Some(now) = player.timestamp() else {
