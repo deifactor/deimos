@@ -9,6 +9,7 @@ use eyre::{eyre, Result};
 use fragile::Fragile;
 use itertools::Itertools;
 use log::error;
+use mpris_server::LoopStatus;
 use symphonia::core::audio::{AudioBuffer, SampleBuffer};
 use tokio::sync::{mpsc::UnboundedSender, Mutex, RwLock};
 
@@ -96,6 +97,10 @@ impl Player {
         })
     }
 
+    pub fn queue(&self) -> &PlayQueue {
+        &self.queue
+    }
+
     /// The currently-playing track.
     pub fn current(&self) -> Option<Arc<Track>> {
         self.queue.current_track()
@@ -112,7 +117,7 @@ impl Player {
     /// Sets the play queue to the given playlist. Also stops existing playback.
     pub async fn set_play_queue(&mut self, tracks: Vec<Arc<Track>>) {
         self.stop().await;
-        self.queue = PlayQueue::new(tracks);
+        self.queue.set_tracks(tracks);
     }
 
     pub fn queue_push(&mut self, track: Arc<Track>) {
@@ -204,6 +209,10 @@ impl Player {
         } else {
             Ok(())
         }
+    }
+
+    pub fn set_loop_status(&mut self, loop_status: LoopStatus) {
+        self.queue.set_loop_status(loop_status)
     }
 }
 

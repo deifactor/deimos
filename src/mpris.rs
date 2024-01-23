@@ -114,11 +114,12 @@ impl PlayerInterface for MprisAdapter {
     }
 
     async fn loop_status(&self) -> fdo::Result<LoopStatus> {
-        Ok(LoopStatus::None)
+        Ok(self.player.read().await.queue().loop_status())
     }
 
-    async fn set_loop_status(&self, _loop_status: LoopStatus) -> zbus::Result<()> {
-        todo!()
+    async fn set_loop_status(&self, loop_status: LoopStatus) -> zbus::Result<()> {
+        self.send_command(Command::SetLoopStatus(loop_status))?;
+        Ok(())
     }
 
     async fn shuffle(&self) -> fdo::Result<bool> {

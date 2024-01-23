@@ -5,7 +5,7 @@ use enum_iterator::next_cycle;
 use eyre::Result;
 use itertools::Itertools;
 use log::debug;
-use mpris_server::{Server, TrackId};
+use mpris_server::{LoopStatus, Server, TrackId};
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
@@ -182,6 +182,7 @@ pub enum Command {
         position: Duration,
         mpris_id: TrackId,
     },
+    SetLoopStatus(LoopStatus),
     /// Adds the currently selected song to the play queue.
     AddSongToQueue,
     /// Seeks to the previous song if near the beginning, or restarts the song if not.
@@ -300,6 +301,9 @@ impl App {
                     player.next().await?;
                 }
                 self.visualizer.reset()?;
+            }
+            SetLoopStatus(loop_status) => {
+                self.player.write().await.set_loop_status(loop_status);
             }
             AddSongToQueue => {
                 let Some(selected) = self.library_panel.track_list.selected() else {
