@@ -1,4 +1,4 @@
-use std::{io::Stdout, sync::Arc, time::Duration};
+use std::{io::Stdout, ops::Deref, sync::Arc, time::Duration};
 
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use eyre::Result;
@@ -8,7 +8,7 @@ use mpris_server::{LoopStatus, Server, TrackId};
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
-    prelude::Backend,
+    prelude::{Backend, Rect},
     Frame, Terminal,
 };
 
@@ -110,23 +110,24 @@ impl App {
     pub async fn draw<T: Backend>(&mut self, terminal: &mut Terminal<T>) -> Result<()> {
         let player = self.player.read().await;
         let mut cb = |f: &mut Frame| {
-            let root = Layout::default()
+            let [panel, bottom] = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Min(10), Constraint::Max(6)])
-                .split(f.size());
+                .splits(f.size());
             match self.active_panel {
-                Panel::Library => {
-                    self.library_panel.draw(&self.ui, f, root[0], player.current())?
-                }
-                Panel::Search => self.search.draw(&self.ui, f, root[0])?,
+                Panel::Library => self.library_panel.draw(&self.ui, f, panel, player.current())?,
+                Panel::Search => self.search.draw(&self.ui, f, panel)?,
             }
-            let bottom = Layout::default()
+            let [now_playing, visualizer] = Layout::default()
                 .direction(Direction::Horizontal)
                 .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
-                .split(root[1]);
-            NowPlaying { timestamp: player.timestamp(), track: player.current() }
-                .draw(&self.ui, f, bottom[0])?;
-            self.visualizer.draw(&self.ui, f, bottom[1])?;
+                .splits(bottom);
+            NowPlaying { timestamp: player.timestamp(), track: player.current() }.draw(
+                &self.ui,
+                f,
+                now_playing,
+            )?;
+            self.visualizer.draw(&self.ui, f, visualizer)?;
             eyre::Ok(())
         };
         terminal.draw(|f| cb(f).expect("failed to render app"))?;
@@ -385,5 +386,16 @@ impl AppEvent {
         UnboundedReceiverStream::new(rx_message)
             .map(AppEvent::Message)
             .merge(terminal_events.map(AppEvent::Terminal))
+    }
+}
+
+trait LayoutExt {
+    /// Convenient method to allow destructuring a split.
+    fn splits<const N: usize>(&self, area: Rect) -> [Rect; N];
+}
+
+impl LayoutExt for Layout {
+    fn splits<const N: usize>(&self, area: Rect) -> [Rect; N] {
+        self.split(area).deref().try_into().unwrap()
     }
 }
