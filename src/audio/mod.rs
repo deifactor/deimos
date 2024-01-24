@@ -117,7 +117,10 @@ impl Player {
     /// Sets the play queue to the given playlist. Also stops existing playback.
     pub async fn set_play_queue(&mut self, tracks: Vec<Arc<Track>>) {
         self.stop().await;
-        self.queue.set_tracks(tracks);
+        let mut queue = PlayQueue::new(tracks);
+        queue.set_loop_status(self.queue.loop_status());
+        queue.set_shuffle(self.queue.shuffle());
+        self.queue = queue;
     }
 
     pub fn queue_push(&mut self, track: Arc<Track>) {

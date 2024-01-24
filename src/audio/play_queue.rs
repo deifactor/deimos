@@ -19,14 +19,6 @@ impl PlayQueue {
         Self { index: None, tracks, loop_status: LoopStatus::None, shuffled: false, original_order }
     }
 
-    /// Sets the tracks to the given list. Also clears the currently playing track, since in
-    /// general there's nothing sensible to do there.
-    pub fn set_tracks(&mut self, tracks: Vec<Arc<Track>>) {
-        self.original_order = tracks.clone();
-        self.tracks = tracks;
-        self.index = None;
-    }
-
     pub fn len(&self) -> usize {
         self.tracks.len()
     }
