@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use eyre::{anyhow, eyre, Result};
 use itertools::Itertools;
 use ratatui::widgets::Sparkline;
-use spectrum_analyzer::{samples_fft_to_spectrum, FrequencyLimit, FrequencySpectrum};
+use spectrum_analyzer::{samples_fft_to_spectrum, Frequency, FrequencyLimit, FrequencyValue};
 
 use symphonia::core::audio::{AudioBuffer, Signal};
 
@@ -30,12 +30,14 @@ impl Default for VisualizerOptions {
 #[derive(Debug)]
 pub struct Visualizer {
     options: VisualizerOptions,
-    /// Buffer of the most recent `options.window_length` samples. Always has length `options.window_length`.
+    /// Buffer of the most recent `options.window_length` samples. Always has length
+    /// `options.window_length`. We continually append to the end of this and then trim off the
+    /// front.
     buffer: Vec<f32>,
     /// The FFT of `buffer`, padded if necessary.
-    spectrum: FrequencySpectrum,
+    spectrum: Vec<(Frequency, FrequencyValue)>,
     amplitudes: Option<Vec<f32>>,
-    /// Precomputed coefficients for Hann windowing.
+    /// Precomputed coefficients for Hann windowing. Same length as `self.buffer`.
     hann_coefficients: Vec<f32>,
 }
 
@@ -61,7 +63,7 @@ impl Visualizer {
         Ok(Self {
             buffer: vec![0.0; options.window_length],
             options,
-            spectrum,
+            spectrum: spectrum.data().to_vec(),
             amplitudes: None,
             hann_coefficients,
         })
@@ -72,12 +74,14 @@ impl Visualizer {
         self.buffer.fill(0.0);
         // no scaling necessary for zeroes
         self.spectrum = samples_fft_to_spectrum(&self.buffer, 44100, FrequencyLimit::All, None)
-            .map_err(|e| eyre!("couldn't FFT: {:?}", e))?;
+            .map_err(|e| eyre!("couldn't FFT: {:?}", e))?
+            .data()
+            .to_vec();
         self.amplitudes = None;
         Ok(())
     }
 
-    /// Recompute `self.spectrum` from the given samples.
+    /// Appends the buffer to the internal buffer. Then recomputes the spectrum accordingly.
     pub fn update_spectrum(&mut self, buffer: AudioBuffer<f32>) -> Result<()> {
         if buffer.spec().channels.count() == 1 {
             self.buffer.extend(buffer.chan(0));
@@ -96,24 +100,16 @@ impl Visualizer {
         // using the scaling function argument computes statistics twice (since the scaling function
         // can use the statistics).
         let samples = self.window_and_scale(&self.buffer);
-        self.spectrum = samples_fft_to_spectrum(&samples, 44100, FrequencyLimit::All, None)
-            .map_err(|e| anyhow!("{:?}", e))?;
-        Ok(())
-    }
-
-    /// Updates `self.amplitudes` using `new_amplitudes`. If they're different
-    /// sizes, just uses `new_amplitudes`, or else lerps between them using the
-    /// decay value. After calling this, `self.amplitudes` is always `Some`.
-    fn merge_amplitudes(&mut self, new_amplitudes: Vec<f32>) {
-        if self.amplitudes.as_ref().map_or(true, |vec| vec.len() != new_amplitudes.len()) {
-            self.amplitudes = Some(new_amplitudes);
-        } else {
-            let amplitudes = self.amplitudes.as_mut().unwrap();
-            for i in 0..amplitudes.len() {
-                amplitudes[i] = (1.0 - self.options.decay) * amplitudes[i]
-                    + self.options.decay * new_amplitudes[i];
-            }
+        let new_spectrum = samples_fft_to_spectrum(&samples, 44100, FrequencyLimit::All, None)
+            .map_err(|e| anyhow!("{:?}", e))?
+            .data()
+            .to_vec();
+        // Merge the old spectrum and the new spectrum.
+        for (old, new) in self.spectrum.iter_mut().zip_eq(new_spectrum.iter()) {
+            old.1 = FrequencyValue::from(1.0 - self.options.decay) * old.1
+                + FrequencyValue::from(self.options.decay) * new.1;
         }
+        Ok(())
     }
 
     /// Picks the `n` frequencies to display the spectrogram at.
@@ -123,27 +119,41 @@ impl Visualizer {
         (0..n).map(move |i| min_freq * step.powi(i as i32))
     }
 
+    /// Get the amplitude of the spectrum at the given point.
+    ///
+    /// If it's exactly in the spectrum list, we return that. Otherwise we lerp between the two
+    /// adjacent values.
+    fn amplitude(&self, frequency: f32) -> f32 {
+        let frequency: Frequency = frequency.into();
+        let index = self.spectrum.binary_search_by_key(&frequency, |(freq, _)| *freq);
+        let amplitude = match index {
+            Ok(index) => self.spectrum[index].1,
+            Err(index) => {
+                let prev = self.spectrum[index.checked_sub(1).unwrap()];
+                let next = self.spectrum[index];
+                prev.1 + (next.1 - prev.1) * (frequency - prev.0) / (next.0 - prev.0)
+            }
+        };
+        amplitude.val()
+    }
+
     pub fn draw(
         &mut self,
         _ui: &crate::ui::Ui,
         frame: &mut ratatui::Frame,
         area: ratatui::layout::Rect,
     ) -> Result<()> {
-        let width = area.width as i32;
+        let width = area.width as usize;
         if width < 2 {
             return Ok(());
         }
 
-        let new_amplitudes = self
-            .frequencies(width as usize)
-            .map(|freq| {
-                self.spectrum.freq_val_exact(freq).val() * (freq / 400.0).powf(2.0).min(1.0)
-            })
+        let u64_amplitudes = self
+            .frequencies(width)
+            .map(|freq| self.amplitude(freq) * (freq / 400.0).powf(2.0).min(1.0))
+            // rescale
+            .map(|x| (x * 64.0) as u64)
             .collect_vec();
-        self.merge_amplitudes(new_amplitudes);
-
-        let u64_amplitudes =
-            self.amplitudes.as_ref().unwrap().iter().map(|x| (x * 64.0) as u64).collect_vec();
 
         let sparkline = Sparkline::default().data(&u64_amplitudes).max(64);
         frame.render_widget(sparkline, area);

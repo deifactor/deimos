@@ -93,6 +93,12 @@ impl App {
             let message = match event {
                 AppEvent::Terminal(terminal_event) => self.lookup_binding(terminal_event),
                 AppEvent::Message(message) => Some(message),
+                AppEvent::Tick => {
+                    if self.tick().await? {
+                        self.draw(terminal).await?;
+                    }
+                    continue;
+                }
             };
             if let Some(message) = message {
                 debug!("Received message {message:?}");
@@ -139,6 +145,12 @@ impl App {
             return None;
         };
         self.key_to_command(code).map(Message::Command)
+    }
+
+    /// Handles a time tick. The return value is true if this needs a refresh; not all ticks
+    /// actually require a redraw.
+    async fn tick(&self) -> Result<bool> {
+        Ok(false)
     }
 }
 
@@ -376,6 +388,8 @@ impl App {
 enum AppEvent {
     Terminal(Event),
     Message(Message),
+    /// Sent every so often. This normally doesn't trigger anything in and of itself.
+    Tick,
 }
 
 impl AppEvent {
@@ -383,9 +397,13 @@ impl AppEvent {
         terminal_events: impl Stream<Item = Event>,
         rx_message: UnboundedReceiver<Message>,
     ) -> impl Stream<Item = Self> {
+        let ticks = tokio_stream::iter(std::iter::from_fn(|| Some(AppEvent::Tick)))
+            .throttle(Duration::from_millis(50));
+
         UnboundedReceiverStream::new(rx_message)
             .map(AppEvent::Message)
             .merge(terminal_events.map(AppEvent::Terminal))
+            .merge(Box::pin(ticks))
     }
 }
 
