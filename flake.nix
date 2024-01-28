@@ -22,6 +22,7 @@
             cargo-nextest
             cargo-outdated
             cargo-flamegraph
+            cargo-llvm-cov
 
             pkg-config
             alsa-lib
