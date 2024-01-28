@@ -1,7 +1,6 @@
-use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use mpris_server::{
-    async_trait,
     zbus::{self, fdo},
     LoopStatus, PlaybackStatus, PlayerInterface, RootInterface, TrackId,
 };
@@ -34,40 +33,24 @@ impl MprisAdapter {
     }
 }
 
-// These two have to use the "manually-expanded" variant of async_trait's functions because
-// async_trait's macro processing happens *before* inner macros expand.
-
 /// Declares a method that sends `Command::$command`.
 macro_rules! sends_command {
     ($method:ident, $command:ident) => {
-        fn $method<'life, 'async_>(
-            &'life self,
-        ) -> Pin<Box<dyn Future<Output = fdo::Result<()>> + Send + 'async_>>
-        where
-            'life: 'async_,
-            Self: Sync + 'async_,
-        {
-            Box::pin(async move { self.send_command(Command::$command) })
+        async fn $method(&self) -> fdo::Result<()> {
+            self.send_command(Command::$command)
         }
     };
 }
 
-/// Declares a method that returns `expr`.
+/// Declares a method that returns `$val`.
 macro_rules! returns {
     ($method:ident, $ty:ty, $val:expr) => {
-        fn $method<'life, 'async_>(
-            &'life self,
-        ) -> Pin<Box<dyn Future<Output = fdo::Result<$ty>> + Send + 'async_>>
-        where
-            'life: 'async_,
-            Self: Sync + 'async_,
-        {
-            Box::pin(async move { Ok($val) })
+        async fn $method(&self) -> fdo::Result<$ty> {
+            Ok($val)
         }
     };
 }
 
-#[async_trait]
 impl RootInterface for MprisAdapter {
     returns!(identity, String, "deimos".into());
     returns!(desktop_entry, String, "".into());
@@ -86,7 +69,6 @@ impl RootInterface for MprisAdapter {
     }
 }
 
-#[async_trait]
 impl PlayerInterface for MprisAdapter {
     // 'traditional' player controls
     sends_command!(next, NextTrack);

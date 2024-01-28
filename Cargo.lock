@@ -1264,13 +1264,12 @@ dependencies = [
 [[package]]
 name = "mpris-server"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf2cdb2dfbe7063acc7fccb9e28d6dc0bc87fec7b343b6d09771a37970e98233"
+source = "git+https://github.com/SeaDve/mpris-server/?branch=afit#8cd262756b877b47c3b65dd6eaad32d4acb90f45"
 dependencies = [
- "async-trait",
  "futures-channel",
  "futures-util",
  "serde",
+ "trait-variant",
  "zbus",
 ]
 
@@ -2350,6 +2349,17 @@ dependencies = [
  "sharded-slab",
  "thread_local",
  "tracing-core",
+]
+
+[[package]]
+name = "trait-variant"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "45e1a477061e97925d81a2f89fb73b2b8038e6baa5a0023bad380ac23b5f4fa6"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.38",
 ]
 
 [[package]]

@@ -41,3 +41,6 @@ opt-level = 3
 opt-level = 0
 [profile.dev]
 lto = false
+
+[patch.crates-io]
+mpris-server = { git = 'https://github.com/SeaDve/mpris-server/', branch = 'afit' }
