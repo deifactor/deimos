@@ -116,24 +116,19 @@ impl App {
     pub async fn draw<T: Backend>(&mut self, terminal: &mut Terminal<T>) -> Result<()> {
         let player = self.player.read().await;
         let mut cb = |f: &mut Frame| {
-            let [panel, bottom] = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Min(10), Constraint::Max(6)])
-                .splits(f.size());
+            let bounds = Bounds::new(f.size());
             match self.active_panel {
-                Panel::Library => self.library_panel.draw(&self.ui, f, panel, player.current())?,
-                Panel::Search => self.search.draw(&self.ui, f, panel)?,
+                Panel::Library => {
+                    self.library_panel.draw(&self.ui, f, bounds.panel, player.current())?
+                }
+                Panel::Search => self.search.draw(&self.ui, f, bounds.panel)?,
             }
-            let [now_playing, visualizer] = Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
-                .splits(bottom);
             NowPlaying { timestamp: player.timestamp(), track: player.current() }.draw(
                 &self.ui,
                 f,
-                now_playing,
+                bounds.now_playing,
             )?;
-            self.visualizer.draw(&self.ui, f, visualizer)?;
+            self.visualizer.draw(&self.ui, f, bounds.visualizer)?;
             eyre::Ok(())
         };
         terminal.draw(|f| cb(f).expect("failed to render app"))?;
@@ -382,6 +377,26 @@ impl App {
             }
         }
         Ok(())
+    }
+}
+
+struct Bounds {
+    panel: Rect,
+    now_playing: Rect,
+    visualizer: Rect,
+}
+
+impl Bounds {
+    fn new(area: Rect) -> Self {
+        let [panel, bottom] = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(10), Constraint::Max(6)])
+            .splits(area);
+        let [now_playing, visualizer] = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+            .splits(bottom);
+        Self { panel, now_playing, visualizer }
     }
 }
 
