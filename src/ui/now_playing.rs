@@ -27,14 +27,15 @@ impl NowPlaying {
         };
 
         let title = track.title.as_deref().unwrap_or("<unknown>");
-        let artist = format!("{}", track.artist);
+        let album = &track.album;
+        let artist = &track.artist;
 
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(1), Constraint::Length(1)])
             .split(area);
         frame.render_widget(
-            Paragraph::new(format!("{title} - {artist}")).alignment(Alignment::Center),
+            Paragraph::new(format!("{artist} - {album} - {title}")).alignment(Alignment::Left),
             chunks[0],
         );
         let mins = timestamp.as_secs() / 60;

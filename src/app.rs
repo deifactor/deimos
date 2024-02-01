@@ -457,11 +457,7 @@ impl Bounds {
             .splits(area);
         let [album_art, now_playing, visualizer] = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Ratio(1, 4),
-                Constraint::Ratio(1, 4),
-                Constraint::Ratio(1, 2),
-            ])
+            .constraints([Constraint::Length(15), Constraint::Ratio(1, 4), Constraint::Ratio(1, 2)])
             .splits(bottom);
         Self { panel, now_playing, visualizer, album_art }
     }
