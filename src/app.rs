@@ -9,7 +9,7 @@ use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     prelude::{Backend, Rect},
-    Frame, Terminal,
+    Terminal,
 };
 
 use tokio::{
@@ -88,6 +88,7 @@ impl App {
 
         let _server = Server::new("deimos", self.mpris.take().unwrap()).await?;
 
+        terminal.hide_cursor()?;
         self.draw(terminal).await?;
         while let Some(event) = event_stream.next().await {
             let message = match event {
@@ -115,23 +116,31 @@ impl App {
 
     pub async fn draw<T: Backend>(&mut self, terminal: &mut Terminal<T>) -> Result<()> {
         let player = self.player.read().await;
-        let mut cb = |f: &mut Frame| {
-            let bounds = Bounds::new(f.size());
-            match self.active_panel {
-                Panel::Library => {
-                    self.library_panel.draw(&self.ui, f, bounds.panel, player.current())?
-                }
-                Panel::Search => self.search.draw(&self.ui, f, bounds.panel)?,
+        // Autoresize - otherwise we get glitches if shrinking or potential desync between widgets
+        // and the terminal (if growing), which may OOB.
+        terminal.autoresize()?;
+
+        let frame = &mut terminal.get_frame();
+        let bounds = Bounds::new(frame.size());
+        match self.active_panel {
+            Panel::Library => {
+                self.library_panel.draw(&self.ui, frame, bounds.panel, player.current())?
             }
-            NowPlaying { timestamp: player.timestamp(), track: player.current() }.draw(
-                &self.ui,
-                f,
-                bounds.now_playing,
-            )?;
-            self.visualizer.draw(&self.ui, f, bounds.visualizer)?;
-            eyre::Ok(())
-        };
-        terminal.draw(|f| cb(f).expect("failed to render app"))?;
+            Panel::Search => self.search.draw(&self.ui, frame, bounds.panel)?,
+        }
+        NowPlaying { timestamp: player.timestamp(), track: player.current() }.draw(
+            &self.ui,
+            frame,
+            bounds.now_playing,
+        )?;
+        self.visualizer.draw(&self.ui, frame, bounds.visualizer)?;
+
+        // Draw to stdout
+        terminal.flush()?;
+        terminal.swap_buffers();
+
+        // Flush
+        terminal.backend_mut().flush()?;
         Ok(())
     }
 
