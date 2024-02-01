@@ -1,9 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use ratatui::{
-    layout::{Alignment, Constraint, Direction, Layout},
-    widgets::Paragraph,
-};
+use ratatui::{style::Stylize, widgets::Paragraph};
 
 use crate::library::Track;
 
@@ -29,23 +26,19 @@ impl NowPlaying {
         let title = track.title.as_deref().unwrap_or("<unknown>");
         let album = &track.album;
         let artist = &track.artist;
-
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Length(1), Constraint::Length(1)])
-            .split(area);
-        frame.render_widget(
-            Paragraph::new(format!("{artist} - {album} - {title}")).alignment(Alignment::Left),
-            chunks[0],
-        );
         let mins = timestamp.as_secs() / 60;
         let secs = timestamp.as_secs() % 60;
 
         let total_mins = (track.length / 60.0).floor() as u64;
         let total_secs = (track.length % 60.0).ceil() as u64;
+
         frame.render_widget(
-            Paragraph::new(format!("{mins:0>2}:{secs:0>2} / {total_mins:0>2}:{total_secs:0>2}")),
-            chunks[1],
+            Paragraph::new(format!(
+                "{artist}\n{album}\n{title}\n\
+                    {mins:0>2}:{secs:0>2} / {total_mins:0>2}:{total_secs:0>2}"
+            ))
+            .bold(),
+            area,
         );
 
         Ok(())
