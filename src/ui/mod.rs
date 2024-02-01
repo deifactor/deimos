@@ -1,3 +1,4 @@
+pub mod album_art;
 pub mod artist_album_list;
 pub mod now_playing;
 pub mod search;

@@ -27,8 +27,8 @@ use crate::{
     library_panel::{LibraryPanel, PanelItem},
     mpris::MprisAdapter,
     ui::{
-        artist_album_list::ArtistAlbumList, now_playing::NowPlaying, search::Search,
-        spectrogram::Visualizer, Ui,
+        album_art::AlbumArt, artist_album_list::ArtistAlbumList, now_playing::NowPlaying,
+        search::Search, spectrogram::Visualizer, Ui,
     },
 };
 
@@ -47,6 +47,7 @@ pub struct App {
     visualizer: Visualizer,
     search: Search,
     active_panel: Panel,
+    album_art: AlbumArt,
     ui: Ui,
     should_quit: bool,
 
@@ -70,6 +71,7 @@ impl App {
             active_panel: Panel::Library,
             ui: Ui::default(),
             should_quit: false,
+            album_art: AlbumArt::new().expect("failed to initialize image display"),
 
             rx_message: Some(rx_message),
         }
@@ -145,6 +147,7 @@ impl App {
             bounds.now_playing,
         )?;
         self.visualizer.draw(&self.ui, frame, bounds.visualizer)?;
+        self.album_art.draw(&self.ui, frame, bounds.album_art, player.current())?;
 
         // Draw to stdout
         terminal.flush()?;
@@ -442,6 +445,7 @@ impl App {
 struct Bounds {
     panel: Rect,
     now_playing: Rect,
+    album_art: Rect,
     visualizer: Rect,
 }
 
@@ -451,11 +455,15 @@ impl Bounds {
             .direction(Direction::Vertical)
             .constraints([Constraint::Min(10), Constraint::Max(6)])
             .splits(area);
-        let [now_playing, visualizer] = Layout::default()
+        let [album_art, now_playing, visualizer] = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+            .constraints([
+                Constraint::Ratio(1, 4),
+                Constraint::Ratio(1, 4),
+                Constraint::Ratio(1, 2),
+            ])
             .splits(bottom);
-        Self { panel, now_playing, visualizer }
+        Self { panel, now_playing, visualizer, album_art }
     }
 }
 
