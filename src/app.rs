@@ -101,11 +101,16 @@ impl App {
                     continue;
                 }
             };
+            let audio_only = message.as_ref().map_or(false, |m| m.audio_only());
             if let Some(message) = message {
                 debug!("Received message {message:?}");
                 self.dispatch(message).await?;
             }
-            self.draw(terminal).await?;
+            if audio_only {
+                self.draw_audio_only(terminal).await?;
+            } else {
+                self.draw(terminal).await?;
+            }
             if self.should_quit {
                 return Ok(());
             }
@@ -115,6 +120,12 @@ impl App {
     }
 
     pub async fn draw<T: Backend>(&mut self, terminal: &mut Terminal<T>) -> Result<()> {
+        // This is kind of an inlined version of Terminal::draw(), with some changes.
+
+        // We swap at the *start* of the function so that `draw_audio_only` won't be working from a
+        // blank buffer.
+        terminal.swap_buffers();
+
         let player = self.player.read().await;
         // Autoresize - otherwise we get glitches if shrinking or potential desync between widgets
         // and the terminal (if growing), which may OOB.
@@ -137,10 +148,37 @@ impl App {
 
         // Draw to stdout
         terminal.flush()?;
-        terminal.swap_buffers();
 
         // Flush
         terminal.backend_mut().flush()?;
+        Ok(())
+    }
+
+    pub async fn draw_audio_only<T: Backend>(&mut self, terminal: &mut Terminal<T>) -> Result<()> {
+        let player = self.player.read().await;
+        terminal.autoresize()?;
+
+        let frame = &mut terminal.get_frame();
+        let bounds = Bounds::new(frame.size());
+        NowPlaying { timestamp: player.timestamp(), track: player.current() }.draw(
+            &self.ui,
+            frame,
+            bounds.now_playing,
+        )?;
+        self.visualizer.draw(&self.ui, frame, bounds.visualizer)?;
+        let buffer = frame.buffer_mut();
+        let mut updates = vec![];
+        for rect in [bounds.now_playing, bounds.visualizer] {
+            for y in rect.top()..rect.bottom() {
+                for x in rect.left()..rect.right() {
+                    updates.push((x, y, buffer.get(x, y).clone()));
+                }
+            }
+        }
+
+        terminal.backend_mut().draw(updates.iter().map(|(x, y, cell)| (*x, *y, cell)))?;
+        terminal.backend_mut().flush()?;
+
         Ok(())
     }
 
@@ -170,6 +208,18 @@ pub enum Motion {
 pub enum Message {
     Command(Command),
     Player(PlayerMessage),
+}
+
+impl Message {
+    /// True if the message corresponds to progress from audio playback. We use this for more
+    /// efficient draw calls.
+    fn audio_only(&self) -> bool {
+        match self {
+            Message::Command(_) => false,
+            Message::Player(PlayerMessage::AudioFragment { .. }) => true,
+            Message::Player(_) => false,
+        }
+    }
 }
 
 /// A [`Command`] corresponds to a single user input. The translation of keys to commands is done
