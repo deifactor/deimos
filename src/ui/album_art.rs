@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use eyre::{eyre, Result};
+use image::DynamicImage;
 use lofty::TaggedFileExt;
 use ratatui::{prelude::Rect, Frame};
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol, Resize, StatefulImage};
@@ -34,10 +35,9 @@ impl AlbumArt {
         }
         self.last_track = Some(Arc::clone(&track));
         let tagged_file = lofty::read_from_path(&track.path)?;
-        let Some(picture) = tagged_file.primary_tag().and_then(|tag| tag.pictures().first()) else {
-            return Ok(());
-        };
-        let image = image::load_from_memory(picture.data())?;
+        let picture = tagged_file.primary_tag().and_then(|tag| tag.pictures().first());
+        let image = picture
+            .map_or(Ok(DynamicImage::new_rgb8(0, 0)), |p| image::load_from_memory(p.data()))?;
         self.image_protocol = Some(self.picker.new_resize_protocol(image));
         Ok(())
     }
