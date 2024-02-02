@@ -51,11 +51,7 @@ impl AlbumArt {
     ) -> Result<()> {
         self.set_track(track)?;
         if let Some(protocol) = self.image_protocol.as_mut() {
-            frame.render_stateful_widget(
-                StatefulImage::new(None).resize(Resize::Fit),
-                area,
-                protocol,
-            );
+            frame.render_stateful_widget(StatefulImage::new(None), area, protocol);
         }
         Ok(())
     }
