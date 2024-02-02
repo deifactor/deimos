@@ -254,8 +254,9 @@ fn normalize(s: impl AsRef<str>) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::test_data;
 
+    use super::*;
     #[test]
     fn equal_test_track_ids_are_equal() {
         assert_eq!(Track::test_track(0), Track::test_track(0));
@@ -265,5 +266,12 @@ mod tests {
     #[test]
     fn unequal_test_track_ids_are_unequal() {
         assert_ne!(Track::test_track(0), Track::test_track(1));
+    }
+
+    #[test]
+    fn no_album_art() -> Result<()> {
+        let track = Track::from_path(&test_data!("3_seconds.mp3"), 0)?;
+        assert_eq!(track.album_art()?, None);
+        Ok(())
     }
 }
