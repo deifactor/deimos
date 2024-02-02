@@ -1,4 +1,5 @@
 use eyre::{eyre, Result};
+use image::DynamicImage;
 use itertools::Itertools;
 use lofty::{Accessor, ItemKey, TaggedFileExt};
 use mpris_server::TrackId;
@@ -73,6 +74,20 @@ pub struct Track {
 impl Track {
     pub fn mpris_id(&self) -> TrackId {
         format!("/{}", self.id).try_into().expect("failed to convert track id to dbus object")
+    }
+
+    /// Looks for album art. This loads the image off disk. Returns `Ok(Some(img))` on success,
+    /// Ok(None)` if the image just doesn't have any album art, and `Err(e)` if something went
+    /// wrong.
+    pub fn album_art(&self) -> Result<Option<DynamicImage>> {
+        let tagged = lofty::read_from_path(&self.path)?;
+        // TODO: look at PictureType? check my collection to see if this is even used.
+        tagged
+            .primary_tag()
+            .and_then(|tag| tag.pictures().first())
+            .map(|img| image::load_from_memory(img.data()))
+            .transpose()
+            .map_err(Into::into)
     }
 
     #[cfg(test)]
