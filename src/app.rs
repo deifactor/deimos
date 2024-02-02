@@ -453,15 +453,15 @@ impl Bounds {
     fn new(area: Rect) -> Self {
         let [main, visualizer] = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Min(1), Constraint::Length(7)])
+            .constraints([Constraint::Min(1), Constraint::Length(4)])
             .splits(area);
         let [side, panel] = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Length(25), Constraint::Min(1)])
+            .constraints([Constraint::Length(32), Constraint::Min(1)])
             .splits(main);
         let [_padding, album_art, now_playing] = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(1), Constraint::Length(13), Constraint::Min(1)])
+            .constraints([Constraint::Length(1), Constraint::Length(16), Constraint::Min(1)])
             .splits(side);
         Self { panel, now_playing, visualizer, album_art }
     }
