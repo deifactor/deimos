@@ -1,25 +1,18 @@
-mod app;
-mod audio;
-mod library;
-mod library_panel;
-mod mpris;
-mod ui;
-
 use std::{
     fs::{self, File},
     io,
     ops::{Deref, DerefMut},
 };
 
-use app::App;
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, EventStream},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use deimos::app::App;
+use deimos::library::Library;
 use directories::{ProjectDirs, UserDirs};
 use eyre::Result;
-use library::Library;
 use log::debug;
 use ratatui::{backend::CrosstermBackend, Terminal};
 
@@ -112,12 +105,4 @@ impl Drop for AppTerminal {
     fn drop(&mut self) {
         AppTerminal::restore_terminal()
     }
-}
-
-#[cfg(test)]
-#[macro_export]
-macro_rules! test_data {
-    ($fname:expr) => {
-        [env!("CARGO_MANIFEST_DIR"), "test_data", $fname].iter().collect::<PathBuf>()
-    };
 }
