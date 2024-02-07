@@ -15,14 +15,13 @@ fn main() -> Result<()> {
             continue;
         };
         let album_art = album_art.into_rgb8();
-        let wu = ColorSchemeOptions { lightness_weight: 0.50, candidates: 6, k_means: false }
-            .candidates(&album_art)?;
+        let wu =
+            ColorSchemeOptions { k_means: false, ..Default::default() }.candidates(&album_art)?;
         println!("Wu candidates");
         display_candidates(&wu)?;
 
         let candidates =
-            ColorSchemeOptions { lightness_weight: 0.50, candidates: 6, k_means: true }
-                .candidates(&album_art)?;
+            ColorSchemeOptions { k_means: true, ..Default::default() }.candidates(&album_art)?;
         println!("k-means");
         display_candidates(&candidates)?;
 

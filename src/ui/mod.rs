@@ -46,7 +46,7 @@ impl Theme {
     }
 
     pub fn from_track(track: &Track) -> Result<Self> {
-        let options = ColorSchemeOptions { lightness_weight: 0.50, candidates: 6, k_means: true };
+        let options = ColorSchemeOptions::default();
         let Some(album_art) = track.album_art()? else {
             return Ok(Self::default());
         };
@@ -99,6 +99,12 @@ pub struct ColorSchemeOptions {
     pub k_means: bool,
 }
 
+impl Default for ColorSchemeOptions {
+    fn default() -> Self {
+        Self { lightness_weight: 0.40, candidates: 8, k_means: true }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ColorScheme {
     /// Suitable for using as the background of album art.
@@ -130,19 +136,23 @@ impl ColorScheme {
             .unwrap_or(Oklch::new(Oklch::min_l(), 0.0, 0.0));
         let mut primary_accent = candidates
             .iter()
-            .find(|color| color.l > 0.4 && color.chroma > 0.05)
+            .filter(|color| color.l > 0.1 && color.chroma > 0.02)
+            .max_by_key(|color| OrderedFloat(color.chroma))
             .cloned()
             .unwrap_or(Oklch::new(Oklch::max_l(), 0.0, 0.0));
         let mut secondary_accent = candidates
             .iter()
-            .filter(|color| color.l > 0.4 && color.chroma > 0.05)
-            // into_radians().abs() ensures that hue 0 and hue 359 are 'close'
-            .max_by_key(|c| (c.hue - primary_accent.hue).into_radians().abs().pipe(OrderedFloat))
+            .filter(|color| color.l > 0.01 && color.chroma > 0.02)
+            .max_by_key(|c| {
+                // into_radians().abs() ensures that hue 0 and hue 359 are 'close'
+                (c.chroma * 2.0 + (c.hue - primary_accent.hue).into_radians().abs())
+                    .pipe(OrderedFloat)
+            })
             .cloned()
             .unwrap_or(primary_accent);
         // apply minimum lightness so it looks good
-        primary_accent.l = primary_accent.l.max(0.6);
-        secondary_accent.l = secondary_accent.l.max(0.6);
+        primary_accent.l = primary_accent.l.max(0.5);
+        secondary_accent.l = secondary_accent.l.max(0.5);
         Self {
             background: crossterm_color(background).into(),
             primary_accent: crossterm_color(primary_accent).into(),
@@ -193,9 +203,9 @@ impl ColorSchemeOptions {
             })
             .zip(quantized.counts)
             .sorted_unstable_by_key(|(_, count)| Reverse(*count))
-            .map(|(color, count)| (color, (count as f32) / (total_counts as f32)))
-            .filter(|(color, _)| color.l > 0.10 && color.l < 0.90)
-            .map(|(color, count)| (Oklch::from_color(color), count))
+            .map(|(color, count)| {
+                (Oklch::from_color(color), (count as f32) / (total_counts as f32))
+            })
             .collect_vec()
     }
 }
