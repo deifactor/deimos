@@ -55,10 +55,8 @@ fn display_candidates(candidates: &[(Oklch, f32)]) -> Result<()> {
 
 fn display_scheme(scheme: ColorScheme) -> Result<()> {
     let mut stdout = std::io::stdout();
-    stdout
-        .execute(PrintStyledContent("background".white().on(crossterm_color(scheme.background))))?;
-    stdout.execute(PrintStyledContent(" primary".with(crossterm_color(scheme.primary_accent))))?;
-    stdout
-        .execute(PrintStyledContent(" secondary".with(crossterm_color(scheme.secondary_accent))))?;
+    stdout.execute(PrintStyledContent("background".white().on(scheme.background.into())))?;
+    stdout.execute(PrintStyledContent(" primary".with(scheme.primary_accent.into())))?;
+    stdout.execute(PrintStyledContent(" secondary".with(scheme.secondary_accent.into())))?;
     Ok(())
 }

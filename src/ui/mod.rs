@@ -16,6 +16,8 @@ use quantette::{kmeans::Centroids, ColorSpace, QuantizeOutput, UniqueColorCounts
 use ratatui::style::{Color, Modifier, Style};
 use tap::Pipe;
 
+use crate::library::Track;
+
 #[derive(Debug, Default)]
 pub struct Ui {
     pub theme: Theme,
@@ -29,16 +31,35 @@ pub struct Theme {
     pub now_playing_track: Style,
 }
 
+impl Theme {
+    pub fn new(colors: &ColorScheme) -> Self {
+        Self {
+            focused_border: Style::default().fg(colors.primary_accent),
+            unfocused_border: Style::default(),
+            section_header: Style::default()
+                .bg(colors.secondary_accent)
+                .add_modifier(Modifier::BOLD | Modifier::ITALIC),
+            now_playing_track: Style::default().fg(colors.primary_accent),
+        }
+    }
+
+    pub fn from_track(track: &Track) -> Result<Self> {
+        let options = ColorSchemeOptions { lightness_weight: 0.64, candidates: 6, k_means: true };
+        let Some(album_art) = track.album_art()? else {
+            return Ok(Self::default());
+        };
+        let candidates = options
+            .candidates(&album_art.into_rgb8())?
+            .into_iter()
+            .map(|(color, _)| color)
+            .collect_vec();
+        Ok(Self::new(&ColorScheme::from_candidates(&candidates)))
+    }
+}
+
 impl Default for Theme {
     fn default() -> Self {
-        Self {
-            focused_border: Style::default().fg(Color::Blue),
-            unfocused_border: Default::default(),
-            section_header: Style::default()
-                .bg(Color::Rgb(0, 0, 60))
-                .add_modifier(Modifier::BOLD | Modifier::ITALIC),
-            now_playing_track: Style::default().fg(Color::LightCyan),
-        }
+        Self::new(&ColorScheme::default())
     }
 }
 
@@ -79,9 +100,19 @@ pub struct ColorSchemeOptions {
 #[derive(Debug, Clone)]
 pub struct ColorScheme {
     /// Suitable for using as the background of album art.
-    pub background: Srgb,
-    pub primary_accent: Srgb,
-    pub secondary_accent: Srgb,
+    pub background: Color,
+    pub primary_accent: Color,
+    pub secondary_accent: Color,
+}
+
+impl Default for ColorScheme {
+    fn default() -> Self {
+        Self {
+            background: Color::Reset,
+            primary_accent: Color::LightCyan,
+            secondary_accent: Color::Blue,
+        }
+    }
 }
 
 impl ColorScheme {
@@ -104,9 +135,9 @@ impl ColorScheme {
             .cloned()
             .unwrap_or(primary_accent);
         Self {
-            background: Srgb::from_color(background),
-            primary_accent: Srgb::from_color(primary_accent),
-            secondary_accent: Srgb::from_color(secondary_accent),
+            background: crossterm_color(background).into(),
+            primary_accent: crossterm_color(primary_accent).into(),
+            secondary_accent: crossterm_color(secondary_accent).into(),
         }
     }
 }
