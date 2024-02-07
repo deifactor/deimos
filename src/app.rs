@@ -23,7 +23,7 @@ use tokio_stream::{wrappers::UnboundedReceiverStream, Stream, StreamExt};
 
 use crate::{
     audio::{Player, PlayerMessage},
-    library::Library,
+    library::{Library, Track},
     library_panel::{LibraryPanel, PanelItem},
     mpris::MprisAdapter,
     ui::{
@@ -147,7 +147,7 @@ impl App {
             bounds.now_playing,
         )?;
         self.visualizer.draw(&self.ui, frame, bounds.visualizer)?;
-        self.album_art.draw(&self.ui, frame, bounds.album_art, player.current())?;
+        self.album_art.draw(&self.ui, frame, bounds.album_art)?;
 
         // Draw to stdout
         terminal.flush()?;
@@ -307,14 +307,7 @@ impl App {
         let new_track = self.player.read().await.current();
         // Check if the track changed; if so, update the theme.
         if old_track != new_track {
-            self.ui.theme = match new_track.as_ref().map(|t| Theme::from_track(t)) {
-                Some(Ok(t)) => t,
-                Some(Err(e)) => {
-                    error!("Failed to get theme for track {new_track:?}: {e}");
-                    Theme::default()
-                }
-                None => Theme::default(),
-            }
+            self.on_track_change(old_track.as_deref()).await?;
         }
         Ok(())
     }
@@ -451,6 +444,19 @@ impl App {
                 self.library_panel.select_entity(&self.library, &selected)?;
             }
         }
+        Ok(())
+    }
+
+    async fn on_track_change(&mut self, track: Option<&Track>) -> Result<()> {
+        self.album_art.set_track(track)?;
+        self.ui.theme = match track.map(Theme::from_track) {
+            Some(Ok(t)) => t,
+            Some(Err(e)) => {
+                error!("Failed to get theme for track {track:?}: {e}");
+                Theme::default()
+            }
+            None => Theme::default(),
+        };
         Ok(())
     }
 }
