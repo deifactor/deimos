@@ -3,7 +3,7 @@ use std::{cell::RefCell, cmp::Reverse, collections::HashSet, ops::DerefMut, sync
 use eyre::Result;
 use itertools::Itertools;
 use nucleo_matcher::{
-    pattern::{CaseMatching, Pattern},
+    pattern::{CaseMatching, Normalization, Pattern},
     Config, Matcher, Utf32String,
 };
 use once_cell::sync::Lazy;
@@ -126,7 +126,7 @@ impl Search {
         let query = query.as_ref();
         self.query = query.to_owned();
 
-        let pattern = Pattern::parse(query, CaseMatching::Ignore);
+        let pattern = Pattern::parse(query, CaseMatching::Ignore, Normalization::Smart);
 
         let artists = library.artists().map(|a| a.name.clone()).map(SearchItem::Artist);
 
