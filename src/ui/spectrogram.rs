@@ -23,7 +23,12 @@ pub struct VisualizerOptions {
 
 impl Default for VisualizerOptions {
     fn default() -> Self {
-        Self { window_length: 4096, decay: 0.2, min_freq: 100.0, max_freq: 3000.0 }
+        Self {
+            window_length: 4096,
+            decay: 0.2,
+            min_freq: 100.0,
+            max_freq: 3000.0,
+        }
     }
 }
 

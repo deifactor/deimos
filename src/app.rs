@@ -142,11 +142,11 @@ impl App {
             }
             Panel::Search => self.search.draw(&self.ui, frame, bounds.panel)?,
         }
-        NowPlaying { timestamp: player.timestamp(), track: player.current() }.draw(
-            &self.ui,
-            frame,
-            bounds.now_playing,
-        )?;
+        NowPlaying {
+            timestamp: player.timestamp(),
+            track: player.current(),
+        }
+        .draw(&self.ui, frame, bounds.now_playing)?;
         self.visualizer.draw(&self.ui, frame, bounds.visualizer)?;
         self.album_art.draw(&self.ui, frame, bounds.album_art)?;
 
@@ -164,11 +164,11 @@ impl App {
 
         let frame = &mut terminal.get_frame();
         let bounds = Bounds::new(frame.size());
-        NowPlaying { timestamp: player.timestamp(), track: player.current() }.draw(
-            &self.ui,
-            frame,
-            bounds.now_playing,
-        )?;
+        NowPlaying {
+            timestamp: player.timestamp(),
+            track: player.current(),
+        }
+        .draw(&self.ui, frame, bounds.now_playing)?;
         self.visualizer.draw(&self.ui, frame, bounds.visualizer)?;
         let buffer = frame.buffer_mut();
 
@@ -201,7 +201,12 @@ impl App {
     }
 
     fn lookup_binding(&self, ev: Event) -> Option<Message> {
-        let Event::Key(KeyEvent { code, kind: KeyEventKind::Press, .. }) = ev else {
+        let Event::Key(KeyEvent {
+            code,
+            kind: KeyEventKind::Press,
+            ..
+        }) = ev
+        else {
             return None;
         };
         self.key_to_command(code).map(Message::Command)
@@ -495,9 +500,18 @@ impl Bounds {
             .splits(main);
         let [_padding, album_art, now_playing] = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Length(1), Constraint::Length(16), Constraint::Min(1)])
+            .constraints([
+                Constraint::Length(1),
+                Constraint::Length(16),
+                Constraint::Min(1),
+            ])
             .splits(side);
-        Self { panel, now_playing, visualizer, album_art }
+        Self {
+            panel,
+            now_playing,
+            visualizer,
+            album_art,
+        }
     }
 }
 

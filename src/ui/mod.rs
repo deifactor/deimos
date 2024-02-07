@@ -101,7 +101,11 @@ pub struct ColorSchemeOptions {
 
 impl Default for ColorSchemeOptions {
     fn default() -> Self {
-        Self { lightness_weight: 0.40, candidates: 8, k_means: true }
+        Self {
+            lightness_weight: 0.40,
+            candidates: 8,
+            k_means: true,
+        }
     }
 }
 
@@ -215,5 +219,9 @@ where
     Srgb: FromColor<T>,
 {
     let srgb = Srgb::from_color(color).into_format::<u8>();
-    crossterm::style::Color::Rgb { r: srgb.red, g: srgb.green, b: srgb.blue }
+    crossterm::style::Color::Rgb {
+        r: srgb.red,
+        g: srgb.green,
+        b: srgb.blue,
+    }
 }

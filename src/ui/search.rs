@@ -88,7 +88,11 @@ impl SearchItem {
             })
             .collect_vec();
 
-        Some(SearchResult { item: self, score, segments })
+        Some(SearchResult {
+            item: self,
+            score,
+            segments,
+        })
     }
 }
 
@@ -144,8 +148,11 @@ impl Search {
         results.sort_by_key(|result| Reverse(result.score));
 
         self.results = results;
-        *self.state.borrow_mut().selected_mut() =
-            if self.results.is_empty() { None } else { Some(0) };
+        *self.state.borrow_mut().selected_mut() = if self.results.is_empty() {
+            None
+        } else {
+            Some(0)
+        };
 
         Ok(())
     }
@@ -159,7 +166,11 @@ impl Search {
             .map(|segment| {
                 Span::styled(
                     segment.text.clone(),
-                    if segment.matched { match_style } else { Style::default() },
+                    if segment.matched {
+                        match_style
+                    } else {
+                        Style::default()
+                    },
                 )
             })
             .collect_vec();
@@ -174,7 +185,11 @@ impl Search {
                 spans.push(Span::raw(format!("- {} - {}", track.album, track.artist)))
             }
         }
-        ListItem::new(Line { spans, alignment: None, style: Style::default() })
+        ListItem::new(Line {
+            spans,
+            alignment: None,
+            style: Style::default(),
+        })
     }
 
     pub fn draw(&self, ui: &super::Ui, frame: &mut Frame, area: Rect) -> Result<()> {

@@ -38,7 +38,10 @@ pub struct Artist {
 
 impl Artist {
     pub fn new(name: ArtistName) -> Self {
-        Self { name, albums: HashMap::new() }
+        Self {
+            name,
+            albums: HashMap::new(),
+        }
     }
 }
 
@@ -55,7 +58,10 @@ pub struct Album {
 
 impl Album {
     pub fn new(name: AlbumName) -> Self {
-        Self { name, tracks: vec![] }
+        Self {
+            name,
+            tracks: vec![],
+        }
     }
 }
 
@@ -73,7 +79,9 @@ pub struct Track {
 
 impl Track {
     pub fn mpris_id(&self) -> TrackId {
-        format!("/{}", self.id).try_into().expect("failed to convert track id to dbus object")
+        format!("/{}", self.id)
+            .try_into()
+            .expect("failed to convert track id to dbus object")
     }
 
     /// Looks for album art. This loads the image off disk. Returns `Ok(Some(img))` on success,
@@ -164,7 +172,8 @@ impl Library {
     }
 
     pub fn albums_with_artist(&self) -> impl Iterator<Item = (&Album, &Artist)> {
-        self.artists().flat_map(|artist| artist.albums.values().map(move |album| (album, artist)))
+        self.artists()
+            .flat_map(|artist| artist.albums.values().map(move |album| (album, artist)))
     }
 
     pub fn albums(&self) -> impl Iterator<Item = &Album> {
@@ -188,8 +197,10 @@ impl Track {
             &Default::default(),
             &Default::default(),
         )?;
-        let stream =
-            probed.format.default_track().ok_or_else(|| eyre!("couldn't find a default track"))?;
+        let stream = probed
+            .format
+            .default_track()
+            .ok_or_else(|| eyre!("couldn't find a default track"))?;
 
         let tagged_file = lofty::read_from_path(path)?;
         let tag = tagged_file.primary_tag().ok_or_else(|| eyre!("no tags found"))?;
@@ -249,7 +260,10 @@ fn normalize(s: impl AsRef<str>) -> String {
         ('\u{201c}', '"'),
         ('\u{201d}', '"'),
     ]);
-    s.as_ref().chars().map(|c| normalize_map.get(&c).copied().unwrap_or(c)).collect()
+    s.as_ref()
+        .chars()
+        .map(|c| normalize_map.get(&c).copied().unwrap_or(c))
+        .collect()
 }
 
 #[cfg(test)]

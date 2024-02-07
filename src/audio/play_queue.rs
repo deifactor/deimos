@@ -16,7 +16,13 @@ pub struct PlayQueue {
 impl PlayQueue {
     pub fn new(tracks: Vec<Arc<Track>>) -> Self {
         let original_order = tracks.clone();
-        Self { index: None, tracks, loop_status: LoopStatus::None, shuffled: false, original_order }
+        Self {
+            index: None,
+            tracks,
+            loop_status: LoopStatus::None,
+            shuffled: false,
+            original_order,
+        }
     }
 
     pub fn len(&self) -> usize {

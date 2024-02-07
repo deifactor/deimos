@@ -38,8 +38,10 @@ impl SymphoniaReader {
         if let Some(ext) = extension {
             hint.with_extension(ext);
         }
-        let format_opts: FormatOptions =
-            FormatOptions { enable_gapless: true, ..Default::default() };
+        let format_opts: FormatOptions = FormatOptions {
+            enable_gapless: true,
+            ..Default::default()
+        };
         let metadata_opts: MetadataOptions = Default::default();
         let probed = get_probe().format(&hint, mss, &format_opts, &metadata_opts)?;
 
@@ -56,10 +58,17 @@ impl SymphoniaReader {
             .channels
             .ok_or_else(|| eyre!("channel count not specified"))?
             .count();
-        let sample_rate =
-            decoder.codec_params().sample_rate.ok_or_else(|| eyre!("sample rate not specified"))?;
+        let sample_rate = decoder
+            .codec_params()
+            .sample_rate
+            .ok_or_else(|| eyre!("sample rate not specified"))?;
 
-        Ok(Self { decoder, format: probed.format, channels, sample_rate })
+        Ok(Self {
+            decoder,
+            format: probed.format,
+            channels,
+            sample_rate,
+        })
     }
 
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
@@ -94,7 +103,13 @@ impl SymphoniaReader {
 
     pub(super) fn seek(&mut self, target: Duration) -> Result<()> {
         let target = Time::new(target.as_secs(), target.as_secs_f64().fract());
-        self.format.seek(SeekMode::Accurate, SeekTo::Time { time: target, track_id: None })?;
+        self.format.seek(
+            SeekMode::Accurate,
+            SeekTo::Time {
+                time: target,
+                track_id: None,
+            },
+        )?;
         // necessary to do this any time there's a seek
         self.decoder.reset();
         Ok(())

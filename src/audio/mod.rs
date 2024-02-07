@@ -273,7 +273,10 @@ impl Source {
         .flat_map(|samples| samples.samples().iter().copied().collect_vec())
         .fuse();
 
-        Self { reader, iterator: Box::new(iterator) }
+        Self {
+            reader,
+            iterator: Box::new(iterator),
+        }
     }
 }
 

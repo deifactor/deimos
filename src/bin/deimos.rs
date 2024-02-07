@@ -67,7 +67,8 @@ async fn main() -> Result<()> {
     let app = App::new(library);
 
     let mut terminal = AppTerminal::new()?;
-    app.run(EventStream::new().filter_map(|ev| ev.ok()), terminal.deref_mut()).await?;
+    app.run(EventStream::new().filter_map(|ev| ev.ok()), terminal.deref_mut())
+        .await?;
 
     Ok(())
 }

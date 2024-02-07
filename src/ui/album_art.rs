@@ -20,7 +20,10 @@ impl AlbumArt {
             Picker::new((7, 14))
         });
         picker.guess_protocol();
-        Self { picker, image_protocol: None }
+        Self {
+            picker,
+            image_protocol: None,
+        }
     }
 
     pub fn set_track(&mut self, track: Option<&Track>) -> Result<()> {

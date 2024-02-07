@@ -53,7 +53,10 @@ pub struct TrackList {
 /// Methods for manipulating the state
 impl TrackList {
     pub fn new(items: Vec<TrackListItem>) -> Self {
-        Self { items, state: RefCell::new(ListState::default()) }
+        Self {
+            items,
+            state: RefCell::new(ListState::default()),
+        }
     }
 
     /// Move the selection by `amount`, which must either be -1 or 1. If the selection would move
@@ -115,8 +118,10 @@ impl TrackList {
         area: Rect,
         current_track: Option<Arc<Track>>,
     ) -> Result<()> {
-        let block =
-            Block::default().title("Tracks").borders(Borders::ALL).border_style(ui.border(state));
+        let block = Block::default()
+            .title("Tracks")
+            .borders(Borders::ALL)
+            .border_style(ui.border(state));
 
         let list = List::new(
             self.items

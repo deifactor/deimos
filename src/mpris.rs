@@ -132,7 +132,10 @@ impl PlayerInterface for MprisAdapter {
 
     async fn set_position(&self, track_id: TrackId, time: mpris_server::Time) -> fdo::Result<()> {
         let position = Duration::from_micros(time.as_micros() as u64);
-        self.send_command(Command::SetPositionIfTrack { position, mpris_id: track_id })
+        self.send_command(Command::SetPositionIfTrack {
+            position,
+            mpris_id: track_id,
+        })
     }
 
     // rate
