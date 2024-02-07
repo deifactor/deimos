@@ -3,7 +3,7 @@ mod audio;
 pub mod library;
 mod library_panel;
 mod mpris;
-mod ui;
+pub mod ui;
 
 #[cfg(test)]
 #[macro_export]
