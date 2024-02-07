@@ -769,6 +769,7 @@ dependencies = [
  "tap",
  "tokio",
  "tokio-stream",
+ "unicode-width",
  "walkdir",
 ]
 

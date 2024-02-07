@@ -20,6 +20,7 @@ use tokio::{
     },
 };
 use tokio_stream::{wrappers::UnboundedReceiverStream, Stream, StreamExt};
+use unicode_width::UnicodeWidthStr;
 
 use crate::{
     audio::{Player, PlayerMessage},
@@ -170,11 +171,25 @@ impl App {
         )?;
         self.visualizer.draw(&self.ui, frame, bounds.visualizer)?;
         let buffer = frame.buffer_mut();
+
+        // this is just Buffer::diff but under the assumption that every character needs to be
+        // updates (since we don't have the previous buffer state to compare against anyway).
         let mut updates = vec![];
         for rect in [bounds.now_playing, bounds.visualizer] {
+            // Cells from the current buffer to skip due to preceding multi-width characters taking
+            // their place (the skipped cells should be blank anyway), or due to per-cell-skipping:
+            let mut to_skip: usize = 0;
             for y in rect.top()..rect.bottom() {
                 for x in rect.left()..rect.right() {
-                    updates.push((x, y, buffer.get(x, y).clone()));
+                    if to_skip > 0 {
+                        to_skip = to_skip.saturating_sub(1);
+                        continue;
+                    }
+                    let current = buffer.get(x, y);
+                    if !current.skip && to_skip == 0 {
+                        updates.push((x, y, current.clone()));
+                        to_skip = current.symbol().width().saturating_sub(1);
+                    }
                 }
             }
         }
