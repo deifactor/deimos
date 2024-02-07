@@ -39,12 +39,14 @@ impl Theme {
             section_header: Style::default()
                 .bg(colors.secondary_accent)
                 .add_modifier(Modifier::BOLD | Modifier::ITALIC),
-            now_playing_track: Style::default().fg(colors.primary_accent),
+            now_playing_track: Style::default()
+                .fg(colors.primary_accent)
+                .add_modifier(Modifier::BOLD),
         }
     }
 
     pub fn from_track(track: &Track) -> Result<Self> {
-        let options = ColorSchemeOptions { lightness_weight: 0.64, candidates: 6, k_means: true };
+        let options = ColorSchemeOptions { lightness_weight: 0.50, candidates: 6, k_means: true };
         let Some(album_art) = track.album_art()? else {
             return Ok(Self::default());
         };
@@ -101,7 +103,9 @@ pub struct ColorSchemeOptions {
 pub struct ColorScheme {
     /// Suitable for using as the background of album art.
     pub background: Color,
+    // A highlight color.
     pub primary_accent: Color,
+    // Another highlight color, ideally one that contrasts with `primary_accent`.
     pub secondary_accent: Color,
 }
 
@@ -117,23 +121,28 @@ impl Default for ColorScheme {
 
 impl ColorScheme {
     pub fn from_candidates(candidates: &[Oklch]) -> Self {
+        // All of these are just guesses and stuff. The numbers don't have any deep roots in human
+        // color perception, they're just what I thought looked nice.
         let background = candidates
             .iter()
             .find(|color| color.l < 0.1)
             .cloned()
             .unwrap_or(Oklch::new(Oklch::min_l(), 0.0, 0.0));
-        let primary_accent = candidates
+        let mut primary_accent = candidates
             .iter()
-            .filter(|color| color.l > 0.5)
-            .max_by_key(|c| OrderedFloat(c.chroma))
+            .find(|color| color.l > 0.4 && color.chroma > 0.05)
             .cloned()
             .unwrap_or(Oklch::new(Oklch::max_l(), 0.0, 0.0));
-        let secondary_accent = candidates
+        let mut secondary_accent = candidates
             .iter()
-            .filter(|color| color.l > 0.5)
+            .filter(|color| color.l > 0.4 && color.chroma > 0.05)
+            // into_radians().abs() ensures that hue 0 and hue 359 are 'close'
             .max_by_key(|c| (c.hue - primary_accent.hue).into_radians().abs().pipe(OrderedFloat))
             .cloned()
             .unwrap_or(primary_accent);
+        // apply minimum lightness so it looks good
+        primary_accent.l = primary_accent.l.max(0.6);
+        secondary_accent.l = secondary_accent.l.max(0.6);
         Self {
             background: crossterm_color(background).into(),
             primary_accent: crossterm_color(primary_accent).into(),

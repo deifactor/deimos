@@ -3,7 +3,7 @@ use std::{io::Stdout, ops::Deref, sync::Arc, time::Duration};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind};
 use eyre::Result;
 use itertools::Itertools;
-use log::debug;
+use log::{debug, error};
 use mpris_server::{LoopStatus, Server, TrackId};
 use ratatui::{
     backend::CrosstermBackend,
@@ -28,7 +28,7 @@ use crate::{
     mpris::MprisAdapter,
     ui::{
         album_art::AlbumArt, artist_album_list::ArtistAlbumList, now_playing::NowPlaying,
-        search::Search, spectrogram::Visualizer, Ui,
+        search::Search, spectrogram::Visualizer, Theme, Ui,
     },
 };
 
@@ -290,6 +290,7 @@ impl App {
 
     async fn dispatch(&mut self, message: Message) -> Result<()> {
         use Message::*;
+        let old_track = self.player.read().await.current();
         match message {
             Command(command) => {
                 self.dispatch_command(command).await?;
@@ -301,6 +302,18 @@ impl App {
             }
             Player(PlayerMessage::Finished) => {
                 self.dispatch_command(self::Command::NextTrack).await?;
+            }
+        }
+        let new_track = self.player.read().await.current();
+        // Check if the track changed; if so, update the theme.
+        if old_track != new_track {
+            self.ui.theme = match new_track.as_ref().map(|t| Theme::from_track(t)) {
+                Some(Ok(t)) => t,
+                Some(Err(e)) => {
+                    error!("Failed to get theme for track {new_track:?}: {e}");
+                    Theme::default()
+                }
+                None => Theme::default(),
             }
         }
         Ok(())
