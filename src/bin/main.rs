@@ -4,6 +4,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use clap::Parser;
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture, EventStream},
     execute,
@@ -12,11 +13,19 @@ use crossterm::{
 use deimos::app::App;
 use deimos::library::Library;
 use directories::{ProjectDirs, UserDirs};
-use eyre::Result;
+use eyre::{eyre, Result};
 use log::debug;
 use ratatui::{backend::CrosstermBackend, Terminal};
 
 use tokio_stream::StreamExt;
+
+#[derive(Parser, Debug)]
+#[command(author, version, about)]
+struct Args {
+    /// Causes deimos to rescan the library from disk, overwriting the existing one.
+    #[arg(long)]
+    rescan_library: bool,
+}
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
@@ -26,6 +35,7 @@ async fn main() -> Result<()> {
     // https://github.com/eyre-rs/color-eyre/issues/148.
     let _ = eyre::eyre!("unused");
     let project_dirs = ProjectDirs::from("ai", "ext0l", "deimos").unwrap();
+    let args = Args::parse();
 
     // set up logging
     let log_target = project_dirs.data_local_dir().join("deimos.log");
@@ -36,7 +46,12 @@ async fn main() -> Result<()> {
 
     // load library
     let cache_path = project_dirs.cache_dir().join("library.json");
-    let library = Library::load(&cache_path).or_else(|_| {
+    let library = if args.rescan_library {
+        Err(eyre!("forcing rescan because of --rescan-library"))
+    } else {
+        Library::load(&cache_path)
+    };
+    let library = library.or_else(|_| {
         let library_path = UserDirs::new().unwrap().home_dir().join("music");
         debug!(
             "Library not found at {}, rescanning {}",
