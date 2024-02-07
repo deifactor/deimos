@@ -307,7 +307,7 @@ impl App {
         let new_track = self.player.read().await.current();
         // Check if the track changed; if so, update the theme.
         if old_track != new_track {
-            self.on_track_change(old_track.as_deref()).await?;
+            self.on_track_change(new_track.as_deref()).await?;
         }
         Ok(())
     }
