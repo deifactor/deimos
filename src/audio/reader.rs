@@ -1,6 +1,6 @@
 use std::{fs::File, path::Path, time::Duration};
 
-use eyre::{bail, Result};
+use eyre::{bail, eyre, Result};
 use symphonia::{
     core::{
         audio::AudioBuffer,
@@ -18,6 +18,8 @@ use symphonia::{
 pub struct SymphoniaReader {
     decoder: Box<dyn Decoder>,
     format: Box<dyn FormatReader>,
+    channels: usize,
+    sample_rate: u32,
 }
 
 /// A decoded audio buffer with some extra context information.
@@ -49,13 +51,29 @@ impl SymphoniaReader {
         let decoder = symphonia::default::get_codecs()
             .make(&stream.codec_params, &DecoderOptions { verify: true })?;
 
-        Ok(Self { decoder, format: probed.format })
+        let channels = decoder
+            .codec_params()
+            .channels
+            .ok_or_else(|| eyre!("channel count not specified"))?
+            .count();
+        let sample_rate =
+            decoder.codec_params().sample_rate.ok_or_else(|| eyre!("sample rate not specified"))?;
+
+        Ok(Self { decoder, format: probed.format, channels, sample_rate })
     }
 
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
         let file = File::open(path.as_ref())?;
         let mss = MediaSourceStream::new(Box::new(file), Default::default());
         Self::new(mss, path.as_ref().extension().and_then(|ext| ext.to_str()))
+    }
+
+    pub fn channels(&self) -> usize {
+        self.channels
+    }
+
+    pub fn sample_rate(&self) -> u32 {
+        self.sample_rate
     }
 
     /// Try to decode a single packet. Semantics are the same as `next`.

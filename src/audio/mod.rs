@@ -2,7 +2,7 @@ use std::{iter, sync::Arc, time::Duration};
 
 use cpal::{
     traits::{DeviceTrait, HostTrait},
-    Sample, Stream,
+    Sample, SampleRate, Stream,
 };
 use educe::Educe;
 use eyre::{eyre, Result};
@@ -36,12 +36,11 @@ pub struct Player {
     timestamp: Option<Duration>,
 
     queue: PlayQueue,
-    /// Streams audio to the underlying OS audio library. We set this up on construction and never
-    /// change it; instead, we just modify what `source` points to.
-    ///
-    /// This is wrapped in [`Fragile`] so that other threads can read the player state; we don't
-    /// make this publicly readable anywhere.
-    _stream: Fragile<Stream>,
+
+    /// Streams audio to the underlying OS audio library. This has a sample rate/channel count
+    /// corresponding to the currently playing song. This is wrapped in [`Fragile`] so that other
+    /// threads can read the player state; we don't make this publicly readable anywhere.
+    stream: Option<Fragile<Stream>>,
 }
 
 #[derive(Educe)]
@@ -57,15 +56,32 @@ pub enum PlayerMessage {
 
 impl Player {
     pub fn new(tx_message: UnboundedSender<Message>) -> Result<Self> {
+        let source: Arc<Mutex<Option<Source>>> = Arc::new(Mutex::new(None));
+        let paused = Arc::new(RwLock::new(true));
+
+        Ok(Self {
+            source,
+            tx_message,
+            paused,
+            timestamp: None,
+            queue: PlayQueue::default(),
+            stream: None,
+        })
+    }
+
+    /// Build a `Stream` that can handle playback with the given channel count and sample rate.
+    fn build_stream(&self, channels: u16, sample_rate: u32) -> Result<Stream> {
         let host = cpal::default_host();
         let device =
             host.default_output_device().ok_or_else(|| eyre!("no default output device"))?;
-        let source: Arc<Mutex<Option<Source>>> = Arc::new(Mutex::new(None));
-        let source_clone = Arc::clone(&source);
-        let paused = Arc::new(RwLock::new(true));
-        let paused_clone = Arc::clone(&paused);
-
-        let config = device.default_output_config()?.config();
+        let config = device
+            .supported_output_configs()?
+            .find(|config| config.channels() == channels)
+            .ok_or_else(|| eyre!("unable to find config supporting {channels} channels"))?
+            .with_sample_rate(SampleRate(sample_rate))
+            .config();
+        let source_clone = Arc::clone(&self.source);
+        let paused_clone = Arc::clone(&self.paused);
         let stream = device.build_output_stream(
             &config,
             move |data: &mut [f32], _| {
@@ -87,14 +103,7 @@ impl Player {
             },
             None,
         )?;
-        Ok(Self {
-            source,
-            tx_message,
-            paused,
-            timestamp: None,
-            queue: PlayQueue::default(),
-            _stream: Fragile::new(stream),
-        })
+        Ok(stream)
     }
 
     pub fn queue(&self) -> &PlayQueue {
@@ -137,7 +146,12 @@ impl Player {
         self.queue.set_current(index);
         let track =
             self.queue.current_track().expect("set current index to non-None, but no track");
-        let reader = Arc::new(Mutex::new(SymphoniaReader::from_path(&track.path)?));
+
+        let reader = SymphoniaReader::from_path(&track.path)?;
+        self.stream =
+            Some(Fragile::new(self.build_stream(reader.channels() as u16, reader.sample_rate())?));
+
+        let reader = Arc::new(Mutex::new(reader));
         let tx_message = self.tx_message.clone();
         let on_decode: DecodeCallback = Box::new(move |fragment| {
             let _ = tx_message.send(Message::Player(PlayerMessage::AudioFragment {
