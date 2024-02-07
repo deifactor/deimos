@@ -174,7 +174,7 @@ impl Search {
                 spans.push(Span::raw(format!("- {} - {}", track.album, track.artist)))
             }
         }
-        ListItem::new(Line { spans, alignment: None })
+        ListItem::new(Line { spans, alignment: None, style: Style::default() })
     }
 
     pub fn draw(&self, ui: &super::Ui, frame: &mut Frame, area: Rect) -> Result<()> {
