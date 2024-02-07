@@ -1,5 +1,6 @@
-use eyre::{eyre, Result};
+use eyre::Result;
 use image::DynamicImage;
+use log::warn;
 use ratatui::{prelude::Rect, Frame};
 use ratatui_image::{picker::Picker, protocol::StatefulProtocol, StatefulImage};
 
@@ -13,11 +14,13 @@ pub struct AlbumArt {
 }
 
 impl AlbumArt {
-    pub fn new() -> Result<Self> {
-        let mut picker =
-            Picker::from_termios().map_err(|e| eyre!("couldn't pick image protocol: {e}"))?;
+    pub fn new() -> Self {
+        let mut picker = Picker::from_termios().unwrap_or_else(|e| {
+            warn!("Unable to infer terminal font size; falling back to 7x14: {e}");
+            Picker::new((7, 14))
+        });
         picker.guess_protocol();
-        Ok(Self { picker, image_protocol: None })
+        Self { picker, image_protocol: None }
     }
 
     pub fn set_track(&mut self, track: Option<&Track>) -> Result<()> {

@@ -71,7 +71,7 @@ impl App {
             active_panel: Panel::Library,
             ui: Ui::default(),
             should_quit: false,
-            album_art: AlbumArt::new().expect("failed to initialize image display"),
+            album_art: AlbumArt::new(),
 
             rx_message: Some(rx_message),
         }
