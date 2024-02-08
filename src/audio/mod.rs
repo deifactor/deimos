@@ -10,8 +10,11 @@ use fragile::Fragile;
 use itertools::Itertools;
 use log::error;
 use mpris_server::LoopStatus;
+use smol::{
+    channel::Sender,
+    lock::{Mutex, RwLock},
+};
 use symphonia::core::audio::{AudioBuffer, SampleBuffer};
-use tokio::sync::{mpsc::UnboundedSender, Mutex, RwLock};
 
 use crate::{app::Message, library::Track};
 
@@ -26,7 +29,7 @@ mod reader;
 pub struct Player {
     /// Provides an iterator over indiviudal samples as well as access to the underlying reader.
     source: Arc<Mutex<Option<Source>>>,
-    tx_message: UnboundedSender<Message>,
+    tx_message: Sender<Message>,
 
     /// If true, playback is paused. If there are no songs in the queue, the value of this is not
     /// specified.
@@ -55,7 +58,7 @@ pub enum PlayerMessage {
 }
 
 impl Player {
-    pub fn new(tx_message: UnboundedSender<Message>) -> Result<Self> {
+    pub fn new(tx_message: Sender<Message>) -> Result<Self> {
         let source: Arc<Mutex<Option<Source>>> = Arc::new(Mutex::new(None));
         let paused = Arc::new(RwLock::new(true));
 
@@ -85,8 +88,8 @@ impl Player {
         let stream = device.build_output_stream(
             &config,
             move |data: &mut [f32], _| {
-                match source_clone.blocking_lock().as_mut() {
-                    Some(iter) if !*paused_clone.blocking_read() => {
+                match source_clone.lock_blocking().as_mut() {
+                    Some(iter) if !*paused_clone.read_blocking() => {
                         // copy from src to dst, zeroing the rest
                         for (dst, src) in
                             data.iter_mut().zip(iter.chain(iter::repeat(f32::EQUILIBRIUM)))
@@ -154,14 +157,14 @@ impl Player {
         let reader = Arc::new(Mutex::new(reader));
         let tx_message = self.tx_message.clone();
         let on_decode: DecodeCallback = Box::new(move |fragment| {
-            let _ = tx_message.send(Message::Player(PlayerMessage::AudioFragment {
+            let _ = tx_message.send_blocking(Message::Player(PlayerMessage::AudioFragment {
                 buffer: fragment.buffer,
                 timestamp: fragment.timestamp,
             }));
         });
         let tx_message = self.tx_message.clone();
         let on_finish: FinishCallback = Box::new(move || {
-            let _ = tx_message.send(Message::Player(PlayerMessage::Finished));
+            let _ = tx_message.send_blocking(Message::Player(PlayerMessage::Finished));
         });
         let source = Source::new(reader, on_decode, on_finish);
         *self.source.lock().await = Some(source);
@@ -256,7 +259,7 @@ impl Source {
         let reader_clone = Arc::clone(&reader);
         let mut on_finish = Some(on_finish);
         let iterator = iter::from_fn(move || {
-            let samples = reader_clone.blocking_lock().next().map(|fragment| {
+            let samples = reader_clone.lock_arc_blocking().next().map(|fragment| {
                 let buffer = &fragment.buffer;
                 let mut samples = SampleBuffer::new(buffer.capacity() as u64, *buffer.spec());
                 samples.copy_interleaved_typed(buffer);

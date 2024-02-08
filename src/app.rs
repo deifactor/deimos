@@ -12,14 +12,7 @@ use ratatui::{
     Terminal,
 };
 
-use tokio::{
-    pin,
-    sync::{
-        mpsc::{unbounded_channel, UnboundedReceiver},
-        RwLock,
-    },
-};
-use tokio_stream::{wrappers::UnboundedReceiverStream, Stream, StreamExt};
+use smol::{channel::Receiver, lock::RwLock, pin, prelude::*};
 use unicode_width::UnicodeWidthStr;
 
 use crate::{
@@ -52,12 +45,12 @@ pub struct App {
     ui: Ui,
     should_quit: bool,
 
-    rx_message: Option<UnboundedReceiver<Message>>,
+    rx_message: Option<Receiver<Message>>,
 }
 
 impl App {
     pub fn new(library: Library) -> Self {
-        let (tx_message, rx_message) = unbounded_channel::<Message>();
+        let (tx_message, rx_message) = smol::channel::unbounded();
 
         let player = Arc::new(RwLock::new(Player::new(tx_message.clone()).unwrap()));
         let mpris = MprisAdapter::new(tx_message.clone(), Arc::clone(&player));
@@ -525,15 +518,14 @@ enum AppEvent {
 impl AppEvent {
     fn stream(
         terminal_events: impl Stream<Item = Event>,
-        rx_message: UnboundedReceiver<Message>,
+        rx_message: Receiver<Message>,
     ) -> impl Stream<Item = Self> {
-        let ticks = tokio_stream::iter(std::iter::from_fn(|| Some(AppEvent::Tick)))
-            .throttle(Duration::from_millis(50));
+        let ticks = smol::stream::iter(std::iter::from_fn(|| Some(AppEvent::Tick)));
 
-        UnboundedReceiverStream::new(rx_message)
+        Box::pin(rx_message)
             .map(AppEvent::Message)
-            .merge(terminal_events.map(AppEvent::Terminal))
-            .merge(Box::pin(ticks))
+            .race(terminal_events.map(AppEvent::Terminal))
+            .race(Box::pin(ticks))
     }
 }
 

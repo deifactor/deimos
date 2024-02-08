@@ -4,7 +4,7 @@ use mpris_server::{
     zbus::{self, fdo},
     LoopStatus, PlaybackStatus, PlayerInterface, RootInterface, TrackId,
 };
-use tokio::sync::{mpsc::UnboundedSender, RwLock};
+use smol::{channel::Sender, lock::RwLock};
 
 use crate::{
     app::{Command, Message},
@@ -15,12 +15,12 @@ use crate::{
 /// Mediates between the `App` struct and the [`RootInterface`] and [`PlayerInterface`] that we
 /// need to implement.
 pub(crate) struct MprisAdapter {
-    tx: UnboundedSender<Message>,
+    tx: Sender<Message>,
     player: Arc<RwLock<Player>>,
 }
 
 impl MprisAdapter {
-    pub fn new(tx: UnboundedSender<Message>, player: Arc<RwLock<Player>>) -> Self {
+    pub fn new(tx: Sender<Message>, player: Arc<RwLock<Player>>) -> Self {
         Self { tx, player }
     }
 
@@ -28,7 +28,7 @@ impl MprisAdapter {
     /// err rather than dying.
     fn send_command(&self, command: Command) -> fdo::Result<()> {
         self.tx
-            .send(Message::Command(command))
+            .send_blocking(Message::Command(command))
             .map_err(|e| fdo::Error::Failed(format!("failed to send command to main task: {e}")))
     }
 }

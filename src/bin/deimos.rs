@@ -16,8 +16,7 @@ use directories::{ProjectDirs, UserDirs};
 use eyre::{eyre, Result};
 use log::debug;
 use ratatui::{backend::CrosstermBackend, Terminal};
-
-use tokio_stream::StreamExt;
+use smol::stream::StreamExt;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
@@ -27,8 +26,7 @@ struct Args {
     rescan_library: bool,
 }
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     color_eyre::install()?;
     // when running with backtrace capture enabled, constructing the first error variant in a
     // program is more expensive (on the order of milliseconds). see
@@ -67,8 +65,9 @@ async fn main() -> Result<()> {
     let app = App::new(library);
 
     let mut terminal = AppTerminal::new()?;
-    app.run(EventStream::new().filter_map(|ev| ev.ok()), terminal.deref_mut())
-        .await?;
+    smol::block_on(async {
+        app.run(EventStream::new().filter_map(|ev| ev.ok()), terminal.deref_mut()).await
+    })?;
 
     Ok(())
 }
